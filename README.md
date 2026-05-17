@@ -1,13 +1,13 @@
 # Selection Specs Generator
 
-`Selection Specs Generator` is a no-build Figma plugin prototype that turns the current selection into implementation-ready specs and Markdown.
+`Selection Specs Generator` is a no-build Figma plugin prototype that turns the current selection into implementation-ready specs, Markdown, and structured JSON.
 
 ## What it does
 
 - Watches the current Figma selection
 - Extracts key layer details for each selected node
 - Displays the results in a compact plugin UI
-- Lets you copy a Markdown spec block for handoff or documentation
+- Lets you copy either Markdown or JSON for handoff, docs, or downstream tooling
 
 ## Specs captured today
 
@@ -17,6 +17,7 @@
 - Auto layout direction, gap, padding, and alignment
 - Corner radius
 - Fills, strokes, stroke weight, and effects
+- Shared Figma style references for fill, stroke, effect, grid, and text styles when present
 - Text content and typography details for text layers
 
 ## Files
@@ -35,7 +36,6 @@
 
 ## Good next extensions
 
-- Export JSON as well as Markdown
 - Group nested child layers into a component tree
 - Flag spacing inconsistencies and missing styles
 - Detect design tokens and map raw values to token names

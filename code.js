@@ -24,6 +24,27 @@ function formatLength(value) {
   return typeof value === "number" ? `${round(value)} px` : "mixed";
 }
 
+function getStyleReference(styleId) {
+  if (!styleId || styleId === figma.mixed) {
+    return null;
+  }
+
+  const style = figma.getStyleById(styleId);
+  if (!style) {
+    return {
+      id: styleId,
+      name: "Unknown style"
+    };
+  }
+
+  return {
+    id: style.id,
+    key: style.key,
+    name: style.name,
+    type: style.type
+  };
+}
+
 function rgbToHex(color) {
   const toChannel = (channel) =>
     Math.round(channel * 255)
@@ -201,6 +222,32 @@ function describeText(node) {
   };
 }
 
+function describeStyleRefs(node) {
+  const styles = {};
+
+  if ("fillStyleId" in node) {
+    styles.fill = getStyleReference(node.fillStyleId);
+  }
+
+  if ("strokeStyleId" in node) {
+    styles.stroke = getStyleReference(node.strokeStyleId);
+  }
+
+  if ("effectStyleId" in node) {
+    styles.effect = getStyleReference(node.effectStyleId);
+  }
+
+  if ("gridStyleId" in node) {
+    styles.grid = getStyleReference(node.gridStyleId);
+  }
+
+  if (node.type === "TEXT" && "textStyleId" in node) {
+    styles.text = getStyleReference(node.textStyleId);
+  }
+
+  return styles;
+}
+
 function buildNodePath(node) {
   const names = [];
   let current = node;
@@ -236,10 +283,19 @@ function collectNodeSpec(node, index) {
     strokes: "strokes" in node ? describePaintList(node.strokes) : "n/a",
     strokeWeight: "strokeWeight" in node ? formatLength(node.strokeWeight) : "n/a",
     effects: "effects" in node ? describeEffects(node.effects) : "n/a",
+    styles: describeStyleRefs(node),
     text: describeText(node)
   };
 
   return spec;
+}
+
+function formatStyleLine(label, styleRef) {
+  if (!styleRef) {
+    return `- ${label}: none`;
+  }
+
+  return `- ${label}: ${styleRef.name} (${styleRef.id})`;
 }
 
 function buildMarkdown(layers) {
@@ -280,6 +336,10 @@ function buildMarkdown(layers) {
     lines.push(`- Strokes: ${layer.strokes}`);
     lines.push(`- Stroke weight: ${layer.strokeWeight}`);
     lines.push(`- Effects: ${layer.effects}`);
+    lines.push(formatStyleLine("Fill style", layer.styles.fill));
+    lines.push(formatStyleLine("Stroke style", layer.styles.stroke));
+    lines.push(formatStyleLine("Effect style", layer.styles.effect));
+    lines.push(formatStyleLine("Grid style", layer.styles.grid));
 
     if (layer.text) {
       lines.push(`- Text content: "${layer.text.content}"`);
@@ -290,6 +350,7 @@ function buildMarkdown(layers) {
       lines.push(`- Text case: ${layer.text.textCase}`);
       lines.push(`- Text decoration: ${layer.text.textDecoration}`);
       lines.push(`- Text align: ${layer.text.horizontalAlign} / ${layer.text.verticalAlign}`);
+      lines.push(formatStyleLine("Text style", layer.styles.text));
     }
 
     lines.push("");
@@ -298,17 +359,27 @@ function buildMarkdown(layers) {
   return lines.join("\n");
 }
 
+function buildJsonPayload(layers, generatedAt) {
+  return {
+    generatedAt,
+    selectedCount: layers.length,
+    selection: layers
+  };
+}
+
 function sendSelectionSpecs() {
   const selection = figma.currentPage.selection;
   const layers = selection.map(collectNodeSpec);
+  const generatedAt = new Date().toISOString();
 
   figma.ui.postMessage({
     type: "selection-specs",
     payload: {
-      generatedAt: new Date().toISOString(),
+      generatedAt,
       selectedCount: layers.length,
       layers,
-      markdown: buildMarkdown(layers)
+      markdown: buildMarkdown(layers),
+      json: JSON.stringify(buildJsonPayload(layers, generatedAt), null, 2)
     }
   });
 }
@@ -326,6 +397,10 @@ figma.ui.onmessage = (message) => {
 
   if (message.type === "copy-complete") {
     figma.notify("Specs copied to clipboard.");
+  }
+
+  if (message.type === "copy-json-complete") {
+    figma.notify("JSON specs copied to clipboard.");
   }
 };
 

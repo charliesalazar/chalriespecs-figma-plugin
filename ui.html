@@ -237,6 +237,7 @@
         </p>
         <div class="toolbar">
           <button class="primary" id="copyButton">Copy Markdown</button>
+          <button class="secondary" id="copyJsonButton">Copy JSON</button>
           <button class="secondary" id="refreshButton">Refresh</button>
           <div class="meta">
             <div class="pill" id="selectionCount">0 layers selected</div>
@@ -256,19 +257,31 @@
 
 Select one or more layers in Figma to generate specs.</pre>
       </section>
+
+      <section class="panel">
+        <h2>JSON Output</h2>
+        <pre id="json">{
+  "generatedAt": "",
+  "selectedCount": 0,
+  "selection": []
+}</pre>
+      </section>
     </div>
 
     <script>
       const state = {
         layers: [],
-        markdown: ""
+        markdown: "",
+        json: ""
       };
 
       const summary = document.getElementById("summary");
       const markdown = document.getElementById("markdown");
+      const json = document.getElementById("json");
       const selectionCount = document.getElementById("selectionCount");
       const generatedAt = document.getElementById("generatedAt");
       const copyButton = document.getElementById("copyButton");
+      const copyJsonButton = document.getElementById("copyJsonButton");
       const refreshButton = document.getElementById("refreshButton");
 
       function formatTimestamp(isoString) {
@@ -292,6 +305,14 @@ Select one or more layers in Figma to generate specs.</pre>
       }
 
       function renderLayer(layer) {
+        const styleRows = Object.entries(layer.styles || {})
+          .filter((entry) => entry[1])
+          .map((entry) => {
+            const label = `${entry[0].charAt(0).toUpperCase()}${entry[0].slice(1)} style`;
+            return `<div class="spec-row"><label>${escapeHtml(label)}</label><div>${escapeHtml(entry[1].name)} <span style="color: var(--muted)">(${escapeHtml(entry[1].id)})</span></div></div>`;
+          })
+          .join("");
+
         const textRows = layer.text
           ? `
             <div class="spec-row"><label>Text</label><div>${escapeHtml(layer.text.content)}</div></div>
@@ -313,6 +334,7 @@ Select one or more layers in Figma to generate specs.</pre>
               <div class="spec-row"><label>Fills</label><div>${escapeHtml(layer.fills)}</div></div>
               <div class="spec-row"><label>Strokes</label><div>${escapeHtml(layer.strokes)}</div></div>
               <div class="spec-row"><label>Effects</label><div>${escapeHtml(layer.effects)}</div></div>
+              ${styleRows}
               ${textRows}
             </div>
           </article>
@@ -322,6 +344,7 @@ Select one or more layers in Figma to generate specs.</pre>
       function render(payload) {
         state.layers = payload.layers || [];
         state.markdown = payload.markdown || "";
+        state.json = payload.json || "";
 
         selectionCount.textContent = `${payload.selectedCount} layer${payload.selectedCount === 1 ? "" : "s"} selected`;
         generatedAt.textContent = payload.selectedCount
@@ -337,40 +360,38 @@ Select one or more layers in Figma to generate specs.</pre>
         }
 
         markdown.textContent = state.markdown;
+        json.textContent = state.json;
       }
 
-      async function copyMarkdown() {
-        if (!state.markdown) {
+      async function copyText(text, successMessageType, button, idleLabel) {
+        if (!text) {
           return false;
         }
 
         try {
           if (navigator.clipboard && navigator.clipboard.writeText) {
-            await navigator.clipboard.writeText(state.markdown);
+            await navigator.clipboard.writeText(text);
           } else {
-            const range = document.createRange();
-            range.selectNodeContents(markdown);
-            const selection = window.getSelection();
-            if (!selection) {
-              throw new Error("Selection API unavailable");
-            }
+            const temp = document.createElement("textarea");
+            temp.value = text;
+            document.body.appendChild(temp);
+            temp.focus();
+            temp.select();
 
-            selection.removeAllRanges();
-            selection.addRange(range);
+            const copied = document.execCommand("copy");
+            document.body.removeChild(temp);
 
-            if (!document.execCommand("copy")) {
+            if (!copied) {
               throw new Error("execCommand copy failed");
             }
-
-            selection.removeAllRanges();
           }
 
-          parent.postMessage({ pluginMessage: { type: "copy-complete" } }, "*");
+          parent.postMessage({ pluginMessage: { type: successMessageType } }, "*");
           return true;
         } catch (error) {
-          copyButton.textContent = "Copy failed";
+          button.textContent = "Copy failed";
           setTimeout(() => {
-            copyButton.textContent = "Copy Markdown";
+            button.textContent = idleLabel;
           }, 1200);
           return false;
         }
@@ -387,7 +408,7 @@ Select one or more layers in Figma to generate specs.</pre>
 
       copyButton.addEventListener("click", async () => {
         const previous = copyButton.textContent;
-        const copied = await copyMarkdown();
+        const copied = await copyText(state.markdown, "copy-complete", copyButton, "Copy Markdown");
         if (!copied) {
           return;
         }
@@ -395,6 +416,19 @@ Select one or more layers in Figma to generate specs.</pre>
         copyButton.textContent = "Copied";
         setTimeout(() => {
           copyButton.textContent = previous;
+        }, 1200);
+      });
+
+      copyJsonButton.addEventListener("click", async () => {
+        const previous = copyJsonButton.textContent;
+        const copied = await copyText(state.json, "copy-json-complete", copyJsonButton, "Copy JSON");
+        if (!copied) {
+          return;
+        }
+
+        copyJsonButton.textContent = "Copied";
+        setTimeout(() => {
+          copyJsonButton.textContent = previous;
         }, 1200);
       });
 
