@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Selection Specs Generator</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        --bg: linear-gradient(180deg, #f5efe3 0%, #e8f0ec 100%);
+        --panel: rgba(255, 255, 255, 0.78);
+        --panel-strong: rgba(255, 255, 255, 0.92);
+        --ink: #102a2a;
+        --muted: #59706e;
+        --accent: #0e7c66;
+        --accent-strong: #085c4c;
+        --line: rgba(16, 42, 42, 0.12);
+        --shadow: 0 18px 48px rgba(18, 37, 34, 0.14);
+      }
+
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: linear-gradient(180deg, #13201f 0%, #0b1615 100%);
+          --panel: rgba(20, 31, 30, 0.8);
+          --panel-strong: rgba(16, 26, 25, 0.92);
+          --ink: #eff6f3;
+          --muted: #a5bbb6;
+          --accent: #5ad0b3;
+          --accent-strong: #88e8cf;
+          --line: rgba(255, 255, 255, 0.08);
+          --shadow: 0 18px 48px rgba(0, 0, 0, 0.3);
+        }
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        font-family: "Avenir Next", "Segoe UI", sans-serif;
+        background: var(--bg);
+        color: var(--ink);
+      }
+
+      .shell {
+        padding: 18px;
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+      }
+
+      .hero,
+      .panel {
+        background: var(--panel);
+        backdrop-filter: blur(16px);
+        border: 1px solid var(--line);
+        border-radius: 18px;
+        box-shadow: var(--shadow);
+      }
+
+      .hero {
+        padding: 18px;
+        position: sticky;
+        top: 0;
+      }
+
+      .eyebrow {
+        margin: 0 0 8px;
+        font-family: "Azeret Mono", "SFMono-Regular", monospace;
+        font-size: 11px;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--accent);
+      }
+
+      h1 {
+        margin: 0;
+        font-size: 26px;
+        line-height: 1;
+        letter-spacing: -0.04em;
+      }
+
+      .subhead {
+        margin: 10px 0 16px;
+        color: var(--muted);
+        font-size: 13px;
+        line-height: 1.45;
+      }
+
+      .toolbar {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        align-items: center;
+      }
+
+      button {
+        border: 0;
+        border-radius: 999px;
+        padding: 11px 16px;
+        font: inherit;
+        font-size: 13px;
+        cursor: pointer;
+        transition: transform 120ms ease, opacity 120ms ease, background 120ms ease;
+      }
+
+      button:hover {
+        transform: translateY(-1px);
+      }
+
+      button:active {
+        transform: translateY(0);
+      }
+
+      .primary {
+        background: var(--accent);
+        color: white;
+      }
+
+      .secondary {
+        background: transparent;
+        color: var(--ink);
+        border: 1px solid var(--line);
+      }
+
+      .meta {
+        margin-left: auto;
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        flex-wrap: wrap;
+      }
+
+      .pill {
+        padding: 7px 11px;
+        border-radius: 999px;
+        background: var(--panel-strong);
+        border: 1px solid var(--line);
+        font-size: 12px;
+        color: var(--muted);
+      }
+
+      .panel {
+        padding: 16px;
+      }
+
+      .panel h2 {
+        margin: 0 0 12px;
+        font-size: 15px;
+        letter-spacing: -0.02em;
+      }
+
+      .empty {
+        color: var(--muted);
+        font-size: 13px;
+        line-height: 1.5;
+      }
+
+      .cards {
+        display: grid;
+        gap: 12px;
+      }
+
+      .card {
+        background: var(--panel-strong);
+        border: 1px solid var(--line);
+        border-radius: 16px;
+        padding: 14px;
+      }
+
+      .card-title {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        align-items: baseline;
+        margin-bottom: 10px;
+      }
+
+      .card-title strong {
+        font-size: 15px;
+        letter-spacing: -0.03em;
+      }
+
+      .card-title span {
+        font-size: 11px;
+        color: var(--muted);
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
+      }
+
+      .spec-grid {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 8px;
+      }
+
+      .spec-row {
+        display: grid;
+        grid-template-columns: 120px 1fr;
+        gap: 10px;
+        font-size: 12px;
+        line-height: 1.45;
+      }
+
+      .spec-row label {
+        color: var(--muted);
+      }
+
+      .spec-row div {
+        word-break: break-word;
+      }
+
+      pre {
+        margin: 0;
+        max-height: 320px;
+        overflow: auto;
+        padding: 14px;
+        border-radius: 14px;
+        background: #101918;
+        color: #effaf4;
+        font-family: "Azeret Mono", "SFMono-Regular", monospace;
+        font-size: 11px;
+        line-height: 1.5;
+        white-space: pre-wrap;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="shell">
+      <section class="hero">
+        <p class="eyebrow">Figma Plugin Concept</p>
+        <h1>Selection Specs</h1>
+        <p class="subhead">
+          Inspect the current selection and turn it into shareable implementation specs. The plugin listens
+          to selection changes and keeps the output current.
+        </p>
+        <div class="toolbar">
+          <button class="primary" id="copyButton">Copy Markdown</button>
+          <button class="secondary" id="refreshButton">Refresh</button>
+          <div class="meta">
+            <div class="pill" id="selectionCount">0 layers selected</div>
+            <div class="pill" id="generatedAt">Waiting for selection</div>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2>Layer Summary</h2>
+        <div id="summary" class="empty">Select one or more frames, components, or text layers in Figma.</div>
+      </section>
+
+      <section class="panel">
+        <h2>Markdown Output</h2>
+        <pre id="markdown"># Selection Specs
+
+Select one or more layers in Figma to generate specs.</pre>
+      </section>
+    </div>
+
+    <script>
+      const state = {
+        layers: [],
+        markdown: ""
+      };
+
+      const summary = document.getElementById("summary");
+      const markdown = document.getElementById("markdown");
+      const selectionCount = document.getElementById("selectionCount");
+      const generatedAt = document.getElementById("generatedAt");
+      const copyButton = document.getElementById("copyButton");
+      const refreshButton = document.getElementById("refreshButton");
+
+      function formatTimestamp(isoString) {
+        const date = new Date(isoString);
+        if (Number.isNaN(date.getTime())) {
+          return "Waiting for selection";
+        }
+
+        return date.toLocaleTimeString([], {
+          hour: "numeric",
+          minute: "2-digit"
+        });
+      }
+
+      function escapeHtml(value) {
+        return String(value)
+          .replaceAll("&", "&amp;")
+          .replaceAll("<", "&lt;")
+          .replaceAll(">", "&gt;")
+          .replaceAll('"', "&quot;");
+      }
+
+      function renderLayer(layer) {
+        const textRows = layer.text
+          ? `
+            <div class="spec-row"><label>Text</label><div>${escapeHtml(layer.text.content)}</div></div>
+            <div class="spec-row"><label>Font</label><div>${escapeHtml(layer.text.fontName)} / ${escapeHtml(layer.text.fontSize)}</div></div>
+            <div class="spec-row"><label>Line</label><div>${escapeHtml(layer.text.lineHeight)} / ${escapeHtml(layer.text.letterSpacing)}</div></div>
+          `
+          : "";
+
+        return `
+          <article class="card">
+            <div class="card-title">
+              <strong>${escapeHtml(layer.name)}</strong>
+              <span>${escapeHtml(layer.type)}</span>
+            </div>
+            <div class="spec-grid">
+              <div class="spec-row"><label>Path</label><div>${escapeHtml(layer.path)}</div></div>
+              <div class="spec-row"><label>Bounds</label><div>${layer.width} x ${layer.height} px at ${layer.x}, ${layer.y}</div></div>
+              <div class="spec-row"><label>Layout</label><div>${escapeHtml(layer.autoLayout)}</div></div>
+              <div class="spec-row"><label>Fills</label><div>${escapeHtml(layer.fills)}</div></div>
+              <div class="spec-row"><label>Strokes</label><div>${escapeHtml(layer.strokes)}</div></div>
+              <div class="spec-row"><label>Effects</label><div>${escapeHtml(layer.effects)}</div></div>
+              ${textRows}
+            </div>
+          </article>
+        `;
+      }
+
+      function render(payload) {
+        state.layers = payload.layers || [];
+        state.markdown = payload.markdown || "";
+
+        selectionCount.textContent = `${payload.selectedCount} layer${payload.selectedCount === 1 ? "" : "s"} selected`;
+        generatedAt.textContent = payload.selectedCount
+          ? `Updated ${formatTimestamp(payload.generatedAt)}`
+          : "Waiting for selection";
+
+        if (!state.layers.length) {
+          summary.className = "empty";
+          summary.innerHTML = "Select one or more frames, components, or text layers in Figma.";
+        } else {
+          summary.className = "cards";
+          summary.innerHTML = state.layers.map(renderLayer).join("");
+        }
+
+        markdown.textContent = state.markdown;
+      }
+
+      async function copyMarkdown() {
+        if (!state.markdown) {
+          return false;
+        }
+
+        try {
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            await navigator.clipboard.writeText(state.markdown);
+          } else {
+            const range = document.createRange();
+            range.selectNodeContents(markdown);
+            const selection = window.getSelection();
+            if (!selection) {
+              throw new Error("Selection API unavailable");
+            }
+
+            selection.removeAllRanges();
+            selection.addRange(range);
+
+            if (!document.execCommand("copy")) {
+              throw new Error("execCommand copy failed");
+            }
+
+            selection.removeAllRanges();
+          }
+
+          parent.postMessage({ pluginMessage: { type: "copy-complete" } }, "*");
+          return true;
+        } catch (error) {
+          copyButton.textContent = "Copy failed";
+          setTimeout(() => {
+            copyButton.textContent = "Copy Markdown";
+          }, 1200);
+          return false;
+        }
+      }
+
+      window.onmessage = (event) => {
+        const message = event.data.pluginMessage;
+        if (!message || message.type !== "selection-specs") {
+          return;
+        }
+
+        render(message.payload);
+      };
+
+      copyButton.addEventListener("click", async () => {
+        const previous = copyButton.textContent;
+        const copied = await copyMarkdown();
+        if (!copied) {
+          return;
+        }
+
+        copyButton.textContent = "Copied";
+        setTimeout(() => {
+          copyButton.textContent = previous;
+        }, 1200);
+      });
+
+      refreshButton.addEventListener("click", () => {
+        parent.postMessage({ pluginMessage: { type: "refresh" } }, "*");
+      });
+    </script>
+  </body>
+</html>
