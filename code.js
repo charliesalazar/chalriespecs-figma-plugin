@@ -4,6 +4,13 @@ figma.showUI(__html__, {
   themeColors: true
 });
 
+const SPEC_CARD_ROLE = "spec-card";
+const SPEC_CARD_ROLE_KEY = "selection-specs-role";
+const SPEC_CARD_SOURCE_KEY = "selection-specs-source";
+const SPEC_CARD_WIDTH = 320;
+const SPEC_CARD_GAP = 64;
+const SPEC_CARD_PADDING = 16;
+
 function round(value) {
   return Math.round(value * 100) / 100;
 }
@@ -367,7 +374,181 @@ function buildJsonPayload(layers, generatedAt) {
   };
 }
 
+function getSelectionState() {
+  const selection = figma.currentPage.selection;
+
+  if (selection.length === 0) {
+    return {
+      canPlace: false,
+      message: "Select a single frame or layer to place specs beside it."
+    };
+  }
+
+  if (selection.length > 1) {
+    return {
+      canPlace: false,
+      message: "Select exactly one frame or layer to place a single specs card."
+    };
+  }
+
+  const target = selection[0];
+
+  if (!("width" in target) || !("height" in target)) {
+    return {
+      canPlace: false,
+      message: `Selection type ${target.type} does not expose frame bounds for canvas specs.`
+    };
+  }
+
+  return {
+    canPlace: true,
+    message: `Ready to place specs beside "${target.name}".`,
+    target
+  };
+}
+
+function getCanvasPosition(node) {
+  return {
+    x: round(node.absoluteTransform[0][2]),
+    y: round(node.absoluteTransform[1][2])
+  };
+}
+
+function truncate(value, maxLength) {
+  if (value.length <= maxLength) {
+    return value;
+  }
+
+  return `${value.slice(0, maxLength - 1)}...`;
+}
+
+function formatStyleRef(styleRef) {
+  return styleRef ? styleRef.name : "none";
+}
+
+function buildCanvasSpecLines(spec) {
+  const lines = [
+    `Type: ${spec.type}`,
+    `Size: ${formatNumber(spec.width)} x ${formatNumber(spec.height)} px`,
+    `Position: ${formatNumber(spec.x)}, ${formatNumber(spec.y)} px`,
+    `Radius: ${spec.cornerRadius}`,
+    `Fills: ${spec.fills}`,
+    `Strokes: ${spec.strokes}`,
+    `Effects: ${spec.effects}`,
+    `Auto layout: ${spec.autoLayout}`,
+    `Fill style: ${formatStyleRef(spec.styles.fill)}`,
+    `Stroke style: ${formatStyleRef(spec.styles.stroke)}`,
+    `Effect style: ${formatStyleRef(spec.styles.effect)}`
+  ];
+
+  if (spec.text) {
+    lines.push(`Text: ${truncate(spec.text.content, 120)}`);
+    lines.push(`Typography: ${spec.text.fontName}, ${spec.text.fontSize}, ${spec.text.lineHeight}`);
+    lines.push(`Text style: ${formatStyleRef(spec.styles.text)}`);
+  }
+
+  return lines;
+}
+
+async function createTextBlock(characters, options) {
+  const text = figma.createText();
+  await figma.loadFontAsync(text.fontName);
+  text.fontSize = options.fontSize;
+  text.characters = characters;
+  text.fills = options.fills;
+  text.textAutoResize = "HEIGHT";
+  text.resize(options.width, Math.max(text.height, 16));
+
+  if (options.letterSpacing) {
+    text.letterSpacing = options.letterSpacing;
+  }
+
+  if (options.textCase) {
+    text.textCase = options.textCase;
+  }
+
+  return text;
+}
+
+function findExistingSpecCard(sourceNodeId) {
+  const existing = figma.currentPage.findOne((node) => {
+    return node.getPluginData(SPEC_CARD_ROLE_KEY) === SPEC_CARD_ROLE && node.getPluginData(SPEC_CARD_SOURCE_KEY) === sourceNodeId;
+  });
+
+  return existing && existing.type === "FRAME" ? existing : null;
+}
+
+async function upsertCanvasSpecCard(target) {
+  const spec = collectNodeSpec(target, 0);
+  const existingCard = findExistingSpecCard(target.id);
+  const card = existingCard || figma.createFrame();
+  const innerWidth = SPEC_CARD_WIDTH - SPEC_CARD_PADDING * 2;
+  const origin = getCanvasPosition(target);
+  const eyebrow = await createTextBlock("LIVE SPECS", {
+    width: innerWidth,
+    fontSize: 11,
+    fills: [{ type: "SOLID", color: { r: 0.055, g: 0.486, b: 0.4 } }],
+    letterSpacing: { unit: "PERCENT", value: 14 },
+    textCase: "UPPER"
+  });
+  const title = await createTextBlock(spec.name, {
+    width: innerWidth,
+    fontSize: 18,
+    fills: [{ type: "SOLID", color: { r: 0.063, g: 0.165, b: 0.165 } }]
+  });
+  const body = await createTextBlock(buildCanvasSpecLines(spec).join("\n"), {
+    width: innerWidth,
+    fontSize: 12,
+    fills: [{ type: "SOLID", color: { r: 0.224, g: 0.31, b: 0.302 } }]
+  });
+
+  for (const child of [...card.children]) {
+    child.remove();
+  }
+
+  card.name = `Specs / ${spec.name}`;
+  card.setPluginData(SPEC_CARD_ROLE_KEY, SPEC_CARD_ROLE);
+  card.setPluginData(SPEC_CARD_SOURCE_KEY, target.id);
+  card.fills = [{ type: "SOLID", color: { r: 0.985, g: 0.968, b: 0.929 } }];
+  card.strokes = [{ type: "SOLID", color: { r: 0.839, g: 0.882, b: 0.867 } }];
+  card.strokeWeight = 1;
+  card.cornerRadius = 18;
+  card.effects = [
+    {
+      type: "DROP_SHADOW",
+      color: { r: 0.071, g: 0.145, b: 0.133, a: 0.12 },
+      offset: { x: 0, y: 12 },
+      radius: 24,
+      spread: 0,
+      visible: true,
+      blendMode: "NORMAL"
+    }
+  ];
+  card.clipsContent = false;
+
+  card.appendChild(eyebrow);
+  card.appendChild(title);
+  card.appendChild(body);
+
+  eyebrow.x = SPEC_CARD_PADDING;
+  eyebrow.y = SPEC_CARD_PADDING;
+  title.x = SPEC_CARD_PADDING;
+  title.y = eyebrow.y + eyebrow.height + 8;
+  body.x = SPEC_CARD_PADDING;
+  body.y = title.y + title.height + 12;
+
+  card.resize(SPEC_CARD_WIDTH, Math.ceil(body.y + body.height + SPEC_CARD_PADDING));
+  card.x = origin.x + target.width + SPEC_CARD_GAP;
+  card.y = origin.y;
+
+  figma.currentPage.appendChild(card);
+  figma.viewport.scrollAndZoomIntoView([target, card]);
+
+  return card;
+}
+
 function sendSelectionSpecs() {
+  const selectionState = getSelectionState();
   const selection = figma.currentPage.selection;
   const layers = selection.map(collectNodeSpec);
   const generatedAt = new Date().toISOString();
@@ -379,12 +560,27 @@ function sendSelectionSpecs() {
       selectedCount: layers.length,
       layers,
       markdown: buildMarkdown(layers),
-      json: JSON.stringify(buildJsonPayload(layers, generatedAt), null, 2)
+      json: JSON.stringify(buildJsonPayload(layers, generatedAt), null, 2),
+      canPlace: selectionState.canPlace,
+      placeMessage: selectionState.message
     }
   });
 }
 
-figma.on("selectionchange", sendSelectionSpecs);
+figma.on("selectionchange", () => {
+  sendSelectionSpecs();
+
+  const selectionState = getSelectionState();
+  if (!selectionState.canPlace || !selectionState.target) {
+    return;
+  }
+
+  if (!findExistingSpecCard(selectionState.target.id)) {
+    return;
+  }
+
+  upsertCanvasSpecCard(selectionState.target).catch(() => {});
+});
 
 figma.ui.onmessage = (message) => {
   if (!message || typeof message.type !== "string") {
@@ -393,6 +589,25 @@ figma.ui.onmessage = (message) => {
 
   if (message.type === "refresh") {
     sendSelectionSpecs();
+  }
+
+  if (message.type === "place-specs") {
+    const selectionState = getSelectionState();
+
+    if (!selectionState.canPlace || !selectionState.target) {
+      figma.notify(selectionState.message, { error: true });
+      sendSelectionSpecs();
+      return;
+    }
+
+    upsertCanvasSpecCard(selectionState.target)
+      .then(() => {
+        figma.notify(`Specs placed beside "${selectionState.target.name}".`);
+        sendSelectionSpecs();
+      })
+      .catch((error) => {
+        figma.notify(`Could not place specs: ${error.message}`, { error: true });
+      });
   }
 
   if (message.type === "copy-complete") {

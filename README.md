@@ -1,12 +1,13 @@
 # Selection Specs Generator
 
-`Selection Specs Generator` is a no-build Figma plugin prototype that turns the current selection into implementation-ready specs, Markdown, and structured JSON.
+`Selection Specs Generator` is a no-build Figma plugin prototype that turns the current selection into implementation-ready specs, places a specs card beside the selected frame on the canvas, and also exposes Markdown and structured JSON.
 
 ## What it does
 
 - Watches the current Figma selection
 - Extracts key layer details for each selected node
-- Displays the results in a compact plugin UI
+- Places a specs card beside the selected frame or layer on the canvas
+- Displays the same data in a compact plugin UI
 - Lets you copy either Markdown or JSON for handoff, docs, or downstream tooling
 
 ## Specs captured today
@@ -32,7 +33,9 @@
 2. Go to `Plugins` -> `Development` -> `Import plugin from manifest...`
 3. Select [manifest.json](/Users/carlossalazar/chalriespecs-figma-plugin/manifest.json).
 4. Run `Selection Specs Generator` from the Development plugins list.
-5. Select layers on the canvas and watch the spec panel update.
+5. Select a single frame or layer on the canvas.
+6. Click `Place On Canvas` to create or update the specs card beside that selection.
+7. Use `Copy Markdown` or `Copy JSON` when you want the same data off-canvas.
 
 ## Good next extensions
 

@@ -141,6 +141,17 @@
         color: var(--muted);
       }
 
+      .status {
+        margin-top: 12px;
+        padding: 10px 12px;
+        border-radius: 12px;
+        background: var(--panel-strong);
+        border: 1px solid var(--line);
+        color: var(--muted);
+        font-size: 12px;
+        line-height: 1.45;
+      }
+
       .panel {
         padding: 16px;
       }
@@ -232,11 +243,12 @@
         <p class="eyebrow">Figma Plugin Concept</p>
         <h1>Selection Specs</h1>
         <p class="subhead">
-          Inspect the current selection and turn it into shareable implementation specs. The plugin listens
-          to selection changes and keeps the output current.
+          Inspect the current selection, preview the generated data, and place a specs card directly on the
+          canvas beside the selected frame or layer.
         </p>
         <div class="toolbar">
-          <button class="primary" id="copyButton">Copy Markdown</button>
+          <button class="primary" id="placeButton">Place On Canvas</button>
+          <button class="secondary" id="copyButton">Copy Markdown</button>
           <button class="secondary" id="copyJsonButton">Copy JSON</button>
           <button class="secondary" id="refreshButton">Refresh</button>
           <div class="meta">
@@ -244,6 +256,7 @@
             <div class="pill" id="generatedAt">Waiting for selection</div>
           </div>
         </div>
+        <div class="status" id="placeStatus">Select a single frame or layer to place specs on the canvas.</div>
       </section>
 
       <section class="panel">
@@ -272,7 +285,9 @@ Select one or more layers in Figma to generate specs.</pre>
       const state = {
         layers: [],
         markdown: "",
-        json: ""
+        json: "",
+        canPlace: false,
+        placeMessage: ""
       };
 
       const summary = document.getElementById("summary");
@@ -280,6 +295,8 @@ Select one or more layers in Figma to generate specs.</pre>
       const json = document.getElementById("json");
       const selectionCount = document.getElementById("selectionCount");
       const generatedAt = document.getElementById("generatedAt");
+      const placeButton = document.getElementById("placeButton");
+      const placeStatus = document.getElementById("placeStatus");
       const copyButton = document.getElementById("copyButton");
       const copyJsonButton = document.getElementById("copyJsonButton");
       const refreshButton = document.getElementById("refreshButton");
@@ -345,11 +362,16 @@ Select one or more layers in Figma to generate specs.</pre>
         state.layers = payload.layers || [];
         state.markdown = payload.markdown || "";
         state.json = payload.json || "";
+        state.canPlace = Boolean(payload.canPlace);
+        state.placeMessage = payload.placeMessage || "";
 
         selectionCount.textContent = `${payload.selectedCount} layer${payload.selectedCount === 1 ? "" : "s"} selected`;
         generatedAt.textContent = payload.selectedCount
           ? `Updated ${formatTimestamp(payload.generatedAt)}`
           : "Waiting for selection";
+        placeButton.disabled = !state.canPlace;
+        placeButton.style.opacity = state.canPlace ? "1" : "0.45";
+        placeStatus.textContent = state.placeMessage;
 
         if (!state.layers.length) {
           summary.className = "empty";
@@ -405,6 +427,10 @@ Select one or more layers in Figma to generate specs.</pre>
 
         render(message.payload);
       };
+
+      placeButton.addEventListener("click", () => {
+        parent.postMessage({ pluginMessage: { type: "place-specs" } }, "*");
+      });
 
       copyButton.addEventListener("click", async () => {
         const previous = copyButton.textContent;
