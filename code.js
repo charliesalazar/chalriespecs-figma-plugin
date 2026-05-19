@@ -9,7 +9,7 @@ figma.showUI(__html__, {
 const SPEC_CARD_ROLE = "spec-card";
 // Shared plugin data needs a namespace plus a key. We keep both values short
 // because they are just lookup labels stored on the generated card node.
-const SPEC_CARD_NAMESPACE = "selection-specs-generator";
+const SPEC_CARD_NAMESPACE = "selection_specs_generator";
 const SPEC_CARD_ROLE_KEY = "role";
 const SPEC_CARD_SOURCE_KEY = "source-node-id";
 const SPEC_CARD_WIDTH = 320;
