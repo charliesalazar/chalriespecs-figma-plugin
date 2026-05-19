@@ -4,6 +4,8 @@ figma.showUI(__html__, {
   themeColors: true
 });
 
+// These keys let the plugin recognize spec cards it created earlier so it can
+// update them instead of creating duplicates on every run.
 const SPEC_CARD_ROLE = "spec-card";
 const SPEC_CARD_ROLE_KEY = "selection-specs-role";
 const SPEC_CARD_SOURCE_KEY = "selection-specs-source";
@@ -31,6 +33,8 @@ function formatLength(value) {
   return typeof value === "number" ? `${round(value)} px` : "mixed";
 }
 
+// Figma exposes shared styles by id; this resolves the id into something
+// human-readable so the spec output can reference the actual style name.
 function getStyleReference(styleId) {
   if (!styleId || styleId === figma.mixed) {
     return null;
@@ -229,6 +233,8 @@ function describeText(node) {
   };
 }
 
+// Different node types expose different style ids, so this normalizes them
+// into one object that downstream formatters can read consistently.
 function describeStyleRefs(node) {
   const styles = {};
 
@@ -267,6 +273,8 @@ function buildNodePath(node) {
   return names.join(" / ");
 }
 
+// This is the core normalization step: raw Figma node data becomes one stable
+// spec object that both the UI panel and the on-canvas card can reuse.
 function collectNodeSpec(node, index) {
   const spec = {
     id: node.id,
@@ -374,6 +382,8 @@ function buildJsonPayload(layers, generatedAt) {
   };
 }
 
+// The canvas placement flow only makes sense for exactly one selected node.
+// The UI uses this state both to enable/disable the button and to explain why.
 function getSelectionState() {
   const selection = figma.currentPage.selection;
 
@@ -426,6 +436,8 @@ function formatStyleRef(styleRef) {
   return styleRef ? styleRef.name : "none";
 }
 
+// The on-canvas card is intentionally shorter than the full panel output so it
+// stays readable next to the frame instead of turning into a giant document.
 function buildCanvasSpecLines(spec) {
   const lines = [
     `Type: ${spec.type}`,
@@ -450,6 +462,7 @@ function buildCanvasSpecLines(spec) {
   return lines;
 }
 
+// Figma requires fonts to be loaded before text nodes can be edited.
 async function createTextBlock(characters, options) {
   const text = figma.createText();
   await figma.loadFontAsync(text.fontName);
@@ -470,6 +483,7 @@ async function createTextBlock(characters, options) {
   return text;
 }
 
+// Plugin data is used as the lookup key that connects a frame to its spec card.
 function findExistingSpecCard(sourceNodeId) {
   const existing = figma.currentPage.findOne((node) => {
     return node.getPluginData(SPEC_CARD_ROLE_KEY) === SPEC_CARD_ROLE && node.getPluginData(SPEC_CARD_SOURCE_KEY) === sourceNodeId;
@@ -478,6 +492,8 @@ function findExistingSpecCard(sourceNodeId) {
   return existing && existing.type === "FRAME" ? existing : null;
 }
 
+// This either creates a new card or rebuilds the existing one in place so the
+// visual spec stays synced with the latest selected-frame data.
 async function upsertCanvasSpecCard(target) {
   const spec = collectNodeSpec(target, 0);
   const existingCard = findExistingSpecCard(target.id);
@@ -547,6 +563,8 @@ async function upsertCanvasSpecCard(target) {
   return card;
 }
 
+// The plugin UI is a read-only view of the current selection state. Every time
+// selection changes or the user refreshes, we send a fresh payload to the UI.
 function sendSelectionSpecs() {
   const selectionState = getSelectionState();
   const selection = figma.currentPage.selection;
@@ -579,9 +597,12 @@ figma.on("selectionchange", () => {
     return;
   }
 
+  // If a card already exists for this node, keep it synced while the plugin is open.
   upsertCanvasSpecCard(selectionState.target).catch(() => {});
 });
 
+// The UI only sends small command messages; the runtime does the real Figma
+// document work because only this context can create and edit canvas nodes.
 figma.ui.onmessage = (message) => {
   if (!message || typeof message.type !== "string") {
     return;

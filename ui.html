@@ -282,6 +282,8 @@ Select one or more layers in Figma to generate specs.</pre>
     </div>
 
     <script>
+      // This mirrors the latest payload from the plugin runtime so button
+      // handlers can work without re-reading the DOM.
       const state = {
         layers: [],
         markdown: "",
@@ -301,6 +303,7 @@ Select one or more layers in Figma to generate specs.</pre>
       const copyJsonButton = document.getElementById("copyJsonButton");
       const refreshButton = document.getElementById("refreshButton");
 
+      // Timestamps come from the plugin runtime as ISO strings.
       function formatTimestamp(isoString) {
         const date = new Date(isoString);
         if (Number.isNaN(date.getTime())) {
@@ -321,6 +324,7 @@ Select one or more layers in Figma to generate specs.</pre>
           .replaceAll('"', "&quot;");
       }
 
+      // Each selected layer renders into one summary card in the plugin panel.
       function renderLayer(layer) {
         const styleRows = Object.entries(layer.styles || {})
           .filter((entry) => entry[1])
@@ -358,6 +362,8 @@ Select one or more layers in Figma to generate specs.</pre>
         `;
       }
 
+      // One payload from the runtime updates every part of the UI at once:
+      // summary cards, export panes, and the canvas-placement button state.
       function render(payload) {
         state.layers = payload.layers || [];
         state.markdown = payload.markdown || "";
@@ -385,6 +391,8 @@ Select one or more layers in Figma to generate specs.</pre>
         json.textContent = state.json;
       }
 
+      // Both copy buttons share the same logic and only differ by the text
+      // source and the success message they send back to the runtime.
       async function copyText(text, successMessageType, button, idleLabel) {
         if (!text) {
           return false;
@@ -419,6 +427,7 @@ Select one or more layers in Figma to generate specs.</pre>
         }
       }
 
+      // The runtime is the source of truth; this UI just reacts to its messages.
       window.onmessage = (event) => {
         const message = event.data.pluginMessage;
         if (!message || message.type !== "selection-specs") {
