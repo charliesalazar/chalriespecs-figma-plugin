@@ -7,8 +7,11 @@ figma.showUI(__html__, {
 // These keys let the plugin recognize spec cards it created earlier so it can
 // update them instead of creating duplicates on every run.
 const SPEC_CARD_ROLE = "spec-card";
-const SPEC_CARD_ROLE_KEY = "selection-specs-role";
-const SPEC_CARD_SOURCE_KEY = "selection-specs-source";
+// Shared plugin data needs a namespace plus a key. We keep both values short
+// because they are just lookup labels stored on the generated card node.
+const SPEC_CARD_NAMESPACE = "selection-specs-generator";
+const SPEC_CARD_ROLE_KEY = "role";
+const SPEC_CARD_SOURCE_KEY = "source-node-id";
 const SPEC_CARD_WIDTH = 320;
 const SPEC_CARD_GAP = 64;
 const SPEC_CARD_PADDING = 16;
@@ -483,10 +486,16 @@ async function createTextBlock(characters, options) {
   return text;
 }
 
-// Plugin data is used as the lookup key that connects a frame to its spec card.
+// Shared plugin data works in local development without a published plugin id.
+// We only use it to connect a selected frame to its generated spec card.
 function findExistingSpecCard(sourceNodeId) {
+  // `findOne` scans the current page and returns the first node that matches.
+  // We look for a frame we previously marked as a spec card for this source node.
   const existing = figma.currentPage.findOne((node) => {
-    return node.getPluginData(SPEC_CARD_ROLE_KEY) === SPEC_CARD_ROLE && node.getPluginData(SPEC_CARD_SOURCE_KEY) === sourceNodeId;
+    return (
+      node.getSharedPluginData(SPEC_CARD_NAMESPACE, SPEC_CARD_ROLE_KEY) === SPEC_CARD_ROLE &&
+      node.getSharedPluginData(SPEC_CARD_NAMESPACE, SPEC_CARD_SOURCE_KEY) === sourceNodeId
+    );
   });
 
   return existing && existing.type === "FRAME" ? existing : null;
@@ -523,8 +532,9 @@ async function upsertCanvasSpecCard(target) {
   }
 
   card.name = `Specs / ${spec.name}`;
-  card.setPluginData(SPEC_CARD_ROLE_KEY, SPEC_CARD_ROLE);
-  card.setPluginData(SPEC_CARD_SOURCE_KEY, target.id);
+  // Mark the card with shared data so future runs can find and update it.
+  card.setSharedPluginData(SPEC_CARD_NAMESPACE, SPEC_CARD_ROLE_KEY, SPEC_CARD_ROLE);
+  card.setSharedPluginData(SPEC_CARD_NAMESPACE, SPEC_CARD_SOURCE_KEY, target.id);
   card.fills = [{ type: "SOLID", color: { r: 0.985, g: 0.968, b: 0.929 } }];
   card.strokes = [{ type: "SOLID", color: { r: 0.839, g: 0.882, b: 0.867 } }];
   card.strokeWeight = 1;
