@@ -15,6 +15,10 @@ const SPEC_CARD_SOURCE_KEY = "source-node-id";
 const SPEC_CARD_WIDTH = 320;
 const SPEC_CARD_GAP = 64;
 const SPEC_CARD_PADDING = 16;
+const VISUAL_SPEC_ROLE = "visual-spec";
+const VISUAL_SPEC_ROLE_KEY = "role";
+const VISUAL_SPEC_SOURCE_KEY = "source-node-id";
+const VISUAL_SPEC_PADDING = 12;
 
 function round(value) {
   return Math.round(value * 100) / 100;
@@ -465,6 +469,308 @@ function buildCanvasSpecLines(spec) {
   return lines;
 }
 
+function findExistingVisualSpec(sourceNodeId) {
+  const existing = figma.currentPage.findOne((node) => {
+    return (
+      node.getSharedPluginData(SPEC_CARD_NAMESPACE, VISUAL_SPEC_ROLE_KEY) === VISUAL_SPEC_ROLE &&
+      node.getSharedPluginData(SPEC_CARD_NAMESPACE, VISUAL_SPEC_SOURCE_KEY) === sourceNodeId
+    );
+  });
+
+  return existing && existing.type === "FRAME" ? existing : null;
+}
+
+function removeChildren(node) {
+  for (const child of [...node.children]) {
+    child.remove();
+  }
+}
+
+async function createVisualText(characters, width, fontSize, color, opts = {}) {
+  const text = figma.createText();
+  await figma.loadFontAsync(text.fontName);
+  text.characters = characters;
+  text.fontSize = fontSize;
+  text.fills = [{ type: "SOLID", color }];
+  text.textAutoResize = "WIDTH_AND_HEIGHT";
+  if (opts.letterSpacing) {
+    text.letterSpacing = opts.letterSpacing;
+  }
+  if (opts.textCase) {
+    text.textCase = opts.textCase;
+  }
+  text.resize(width, Math.max(text.height, 16));
+  return text;
+}
+
+function createVisualBand(x, y, width, height, color, opacity) {
+  const band = figma.createRectangle();
+  band.x = x;
+  band.y = y;
+  band.resize(Math.max(width, 1), Math.max(height, 1));
+  band.fills = [{ type: "SOLID", color, opacity }];
+  band.strokes = [];
+  band.cornerRadius = 0;
+  band.locked = false;
+  return band;
+}
+
+async function createVisualLabel(text, x, y, color, width = 84) {
+  const label = await createVisualText(text, width, 12, color);
+  label.x = x;
+  label.y = y;
+  label.textAutoResize = "WIDTH_AND_HEIGHT";
+  return label;
+}
+
+async function createPillLabel(text, color) {
+  const pill = figma.createFrame();
+  pill.fills = [];
+  pill.strokes = [{ type: "SOLID", color }];
+  pill.strokeWeight = 1;
+  pill.cornerRadius = 999;
+  pill.clipsContent = false;
+
+  const label = await createVisualText(text, 140, 12, color);
+  label.x = 12;
+  label.y = 5;
+
+  pill.appendChild(label);
+  pill.resize(Math.ceil(label.width + 24), 24);
+  return pill;
+}
+
+function findChildByType(node, type) {
+  return node.findOne((child) => child.type === type);
+}
+
+function findNodeByName(node, needle) {
+  const lowerNeedle = needle.toLowerCase();
+  return node.findOne((child) => child.name.toLowerCase().includes(lowerNeedle));
+}
+
+function findFirstStrokeNode(node) {
+  if (
+    "strokes" in node &&
+    Array.isArray(node.strokes) &&
+    node.strokes.length > 0 &&
+    "strokeWeight" in node
+  ) {
+    return node;
+  }
+
+  if (!("children" in node)) {
+    return null;
+  }
+
+  for (const child of node.children) {
+    const strokedChild = findFirstStrokeNode(child);
+    if (strokedChild) {
+      return strokedChild;
+    }
+  }
+
+  return null;
+}
+
+function getRelativeRect(node, ancestor) {
+  return {
+    x: node.absoluteTransform[0][2] - ancestor.absoluteTransform[0][2],
+    y: node.absoluteTransform[1][2] - ancestor.absoluteTransform[1][2],
+    width: "width" in node ? node.width : 0,
+    height: "height" in node ? node.height : 0
+  };
+}
+
+function getPaddingValues(node) {
+  if (!("paddingTop" in node)) {
+    return null;
+  }
+
+  return {
+    top: round(node.paddingTop),
+    right: round(node.paddingRight),
+    bottom: round(node.paddingBottom),
+    left: round(node.paddingLeft)
+  };
+}
+
+async function upsertVisualSpecOverlay(target, specCard = null) {
+  const existing = findExistingVisualSpec(target.id);
+  const overlay = existing || figma.createFrame();
+  const origin = getCanvasPosition(target);
+  const card = specCard || findExistingSpecCard(target.id);
+  const padding = getPaddingValues(target);
+  const isText = target.type === "TEXT";
+  const textNode = isText ? target : findChildByType(target, "TEXT");
+  const iconNode = findNodeByName(target, "pizza icon");
+  const studyWidth = Math.max(target.width + 92, 220);
+  const studyHeight = Math.max(target.height + 144, 200);
+  const studyGap = 28;
+  const topMargin = 108;
+  const bottomMargin = 40;
+  const leftMargin = 32;
+  const targetLocalY = topMargin;
+  const widthGuideY = targetLocalY - 28;
+  const heightGuideY = targetLocalY;
+  const overlayX = origin.x - leftMargin;
+  const overlayY = origin.y - topMargin;
+  const cardLocalBottom = card ? card.y - (origin.y - topMargin) + card.height : topMargin + target.height;
+  const studyY = Math.max(cardLocalBottom + 72, topMargin + target.height + 220);
+  const rowWidth = studyWidth * 3 + studyGap * 2;
+  const targetGuideX = leftMargin;
+  const studyStartX = Math.max(targetGuideX + target.width + 220, leftMargin + 240);
+  const cardRight = card ? card.x - overlayX + card.width : targetGuideX + target.width;
+  const overlayWidth = Math.max(targetGuideX + target.width + leftMargin, cardRight + leftMargin, studyStartX + rowWidth + leftMargin);
+  const overlayHeight = studyY + studyHeight + bottomMargin;
+  const paddingColor = { r: 0.98, g: 0.72, b: 0.34 };
+  const strokeColor = { r: 0.97, g: 0.37, b: 0.29 };
+  const textColor = { r: 0.53, g: 0.37, b: 0.92 };
+  const sizeColor = { r: 0.33, g: 0.78, b: 0.73 };
+
+  removeChildren(overlay);
+
+  overlay.name = `Visual Specs / ${target.name}`;
+  overlay.setSharedPluginData(SPEC_CARD_NAMESPACE, VISUAL_SPEC_ROLE_KEY, VISUAL_SPEC_ROLE);
+  overlay.setSharedPluginData(SPEC_CARD_NAMESPACE, VISUAL_SPEC_SOURCE_KEY, target.id);
+  overlay.x = overlayX;
+  overlay.y = overlayY;
+  overlay.resize(Math.max(overlayWidth, 1), Math.max(overlayHeight, 1));
+  overlay.fills = [];
+  overlay.strokes = [];
+  overlay.clipsContent = false;
+  overlay.opacity = 1;
+
+  overlay.appendChild(createVisualBand(targetGuideX, widthGuideY, target.width, 2, sizeColor, 1));
+  overlay.appendChild(createVisualBand(targetGuideX - 18, heightGuideY, 2, target.height, sizeColor, 1));
+  overlay.appendChild(await createVisualLabel(`${Math.round(target.width)} px`, targetGuideX + Math.max(target.width / 2 - 24, 0), widthGuideY - 16, sizeColor, 70));
+  overlay.appendChild(await createVisualLabel(`${Math.round(target.height)} px`, targetGuideX - 60, heightGuideY + Math.max(target.height / 2 - 8, 0), sizeColor, 70));
+  overlay.appendChild(await createVisualLabel(target.name, targetGuideX, widthGuideY - 28, { r: 0.39, g: 0.54, b: 0.98 }, 140));
+
+  const createStudyFrame = async (title, color, x) => {
+    const frame = figma.createFrame();
+    frame.fills = [];
+    frame.strokes = [{ type: "SOLID", color }];
+    frame.strokeWeight = 1;
+    frame.cornerRadius = 16;
+    frame.clipsContent = false;
+    frame.resize(studyWidth, studyHeight);
+    frame.x = x;
+    frame.y = studyY;
+    const pill = await createPillLabel(title, color);
+    pill.x = 24;
+    pill.y = 12;
+    frame.appendChild(pill);
+    return frame;
+  };
+
+  const createStudyClone = (frame) => {
+    const clone = target.clone();
+    clone.x = Math.max((studyWidth - target.width) / 2, 24);
+    clone.y = 68;
+    frame.appendChild(clone);
+    return clone;
+  };
+
+  const paddingFrame = await createStudyFrame("Padding only", paddingColor, studyStartX);
+  const strokeFrame = await createStudyFrame("Stroke only", strokeColor, studyStartX + studyWidth + studyGap);
+  const textFrame = await createStudyFrame("Text only", textColor, studyStartX + (studyWidth + studyGap) * 2);
+
+  overlay.appendChild(paddingFrame);
+  overlay.appendChild(strokeFrame);
+  overlay.appendChild(textFrame);
+
+  const paddingClone = createStudyClone(paddingFrame);
+  const strokeClone = createStudyClone(strokeFrame);
+  const textClone = createStudyClone(textFrame);
+
+  if (padding) {
+    const topBand = createVisualBand(paddingClone.x, paddingClone.y, paddingClone.width, padding.top, paddingColor, 0.42);
+    const rightBand = createVisualBand(
+      paddingClone.x + Math.max(paddingClone.width - padding.right, 0),
+      paddingClone.y,
+      padding.right,
+      paddingClone.height,
+      paddingColor,
+      0.42
+    );
+    const bottomBand = createVisualBand(
+      paddingClone.x,
+      paddingClone.y + Math.max(paddingClone.height - padding.bottom, 0),
+      paddingClone.width,
+      padding.bottom,
+      paddingColor,
+      0.42
+    );
+    const leftBand = createVisualBand(paddingClone.x, paddingClone.y, padding.left, paddingClone.height, paddingColor, 0.42);
+    topBand.strokes = [{ type: "SOLID", color: paddingColor, opacity: 0.65 }];
+    rightBand.strokes = [{ type: "SOLID", color: paddingColor, opacity: 0.65 }];
+    bottomBand.strokes = [{ type: "SOLID", color: paddingColor, opacity: 0.65 }];
+    leftBand.strokes = [{ type: "SOLID", color: paddingColor, opacity: 0.65 }];
+    paddingFrame.appendChild(topBand);
+    paddingFrame.appendChild(rightBand);
+    paddingFrame.appendChild(bottomBand);
+    paddingFrame.appendChild(leftBand);
+
+    const topLabel = await createVisualLabel(`T ${padding.top}`, paddingClone.x + Math.max(paddingClone.width / 2 - 18, 0), 36, paddingColor, 54);
+    const leftLabel = await createVisualLabel(`L ${padding.left}`, 8, paddingClone.y + Math.max(paddingClone.height / 2 - 10, 0), paddingColor, 54);
+    const rightLabel = await createVisualLabel(`R ${padding.right}`, paddingClone.x + paddingClone.width + 8, paddingClone.y + Math.max(paddingClone.height / 2 - 10, 0), paddingColor, 54);
+    const bottomLabel = await createVisualLabel(`B ${padding.bottom}`, paddingClone.x + Math.max(paddingClone.width / 2 - 18, 0), paddingClone.y + paddingClone.height + 18, paddingColor, 54);
+    paddingFrame.appendChild(topLabel);
+    paddingFrame.appendChild(leftLabel);
+    paddingFrame.appendChild(rightLabel);
+    paddingFrame.appendChild(bottomLabel);
+  }
+
+  if (iconNode) {
+    const iconWidth = "width" in iconNode ? iconNode.width : null;
+    const iconHeight = "height" in iconNode ? iconNode.height : null;
+    const strokeNode = findFirstStrokeNode(iconNode);
+    const strokeWeight = strokeNode && "strokeWeight" in strokeNode ? formatLength(strokeNode.strokeWeight) : null;
+    const iconInClone = findNodeByName(strokeClone, "pizza icon");
+    const iconRect = iconInClone ? getRelativeRect(iconInClone, strokeFrame) : null;
+    const iconLineX = iconRect ? iconRect.x + Math.max(iconRect.width / 2, 0) : strokeClone.x + 20;
+    const iconLineTop = iconRect ? iconRect.y + Math.max(iconRect.height, 0) + 4 : strokeClone.y + strokeClone.height + 8;
+    const iconLabelY = Math.min(studyHeight - 42, strokeClone.y + strokeClone.height + 48);
+    const iconLineHeight = Math.max(iconLabelY - iconLineTop - 8, 20);
+    const iconCallout = await createVisualLabel(
+      `icon ${iconWidth ? `${Math.round(iconWidth)} x ${Math.round(iconHeight)}` : "size"}${strokeWeight ? `, ${strokeWeight}` : ""}`,
+      Math.max(iconLineX - 42, 16),
+      iconLabelY,
+      strokeColor,
+      studyWidth - 32
+    );
+    strokeFrame.appendChild(iconCallout);
+    strokeFrame.appendChild(createVisualBand(iconLineX, iconLineTop, 2, iconLineHeight, strokeColor, 1));
+  }
+
+  if (textNode) {
+    const textInClone = findChildByType(textClone, "TEXT") || textNode;
+    const textRect = getRelativeRect(textInClone, textFrame);
+    const textSpec = describeText(textNode);
+    const textLineX = textRect.x + Math.max(textRect.width / 2, 0);
+    const textLineTop = textRect.y + Math.max(textRect.height, 0) + 4;
+    const textLabelY = Math.min(studyHeight - 42, textClone.y + textClone.height + 48);
+    const textLineHeight = Math.max(textLabelY - textLineTop - 8, 20);
+    const textCallout = await createVisualLabel(
+      textSpec ? `${textSpec.fontName}, ${textSpec.fontSize}` : "text style",
+      Math.max(textLineX - 70, 16),
+      textLabelY,
+      textColor,
+      studyWidth - 32
+    );
+    textFrame.appendChild(createVisualBand(textRect.x, textRect.y + Math.max(textRect.height, 0) + 1, Math.max(textRect.width, 1), 2, textColor, 1));
+    textFrame.appendChild(createVisualBand(textLineX, textLineTop, 2, textLineHeight, textColor, 1));
+    textFrame.appendChild(textCallout);
+  }
+
+  if (!existing) {
+    figma.currentPage.appendChild(overlay);
+  }
+
+  return overlay;
+}
+
 // Figma requires fonts to be loaded before text nodes can be edited.
 async function createTextBlock(characters, options) {
   const text = figma.createText();
@@ -568,7 +874,6 @@ async function upsertCanvasSpecCard(target) {
   card.y = origin.y;
 
   figma.currentPage.appendChild(card);
-  figma.viewport.scrollAndZoomIntoView([target, card]);
 
   return card;
 }
@@ -609,6 +914,9 @@ figma.on("selectionchange", () => {
 
   // If a card already exists for this node, keep it synced while the plugin is open.
   upsertCanvasSpecCard(selectionState.target).catch(() => {});
+  if (findExistingVisualSpec(selectionState.target.id)) {
+    upsertVisualSpecOverlay(selectionState.target).catch(() => {});
+  }
 });
 
 // The UI only sends small command messages; the runtime does the real Figma
@@ -632,7 +940,11 @@ figma.ui.onmessage = (message) => {
     }
 
     upsertCanvasSpecCard(selectionState.target)
-      .then(() => {
+      .then((card) => {
+        return upsertVisualSpecOverlay(selectionState.target, card).then((overlay) => ({ card, overlay }));
+      })
+      .then(({ card, overlay }) => {
+        figma.viewport.scrollAndZoomIntoView([selectionState.target, card, overlay]);
         figma.notify(`Specs placed beside "${selectionState.target.name}".`);
         sendSelectionSpecs();
       })
