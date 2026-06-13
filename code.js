@@ -15,6 +15,7 @@ const SPEC_CARD_SOURCE_KEY = "source-node-id";
 const SPEC_CARD_WIDTH = 320;
 const SPEC_CARD_GAP = 64;
 const SPEC_CARD_PADDING = 16;
+const SPEC_CARD_LABEL_WIDTH = 78;
 const VISUAL_SPEC_ROLE = "visual-spec";
 const VISUAL_SPEC_ROLE_KEY = "role";
 const VISUAL_SPEC_SOURCE_KEY = "source-node-id";
@@ -519,34 +520,45 @@ function truncate(value, maxLength) {
   return `${value.slice(0, maxLength - 1)}...`;
 }
 
-function formatStyleRef(styleRef) {
-  return styleRef ? styleRef.name : "none";
-}
-
-// The on-canvas card is intentionally shorter than the full panel output so it
-// stays readable next to the frame instead of turning into a giant document.
-function buildCanvasSpecLines(spec) {
-  const lines = [
-    `Type: ${spec.type}`,
-    `Size: ${formatNumber(spec.width)} x ${formatNumber(spec.height)} px`,
-    `Position: ${formatNumber(spec.x)}, ${formatNumber(spec.y)} px`,
-    `Radius: ${spec.cornerRadius}`,
-    `Fills: ${spec.fills}`,
-    `Strokes: ${spec.strokes}`,
-    `Effects: ${spec.effects}`,
-    `Auto layout: ${spec.autoLayout}`,
-    `Fill style: ${formatStyleRef(spec.styles.fill)}`,
-    `Stroke style: ${formatStyleRef(spec.styles.stroke)}`,
-    `Effect style: ${formatStyleRef(spec.styles.effect)}`
-  ];
-
-  if (spec.text) {
-    lines.push(`Text: ${truncate(spec.text.content, 120)}`);
-    lines.push(`Typography: ${spec.text.fontName}, ${spec.text.fontSize}, ${spec.text.lineHeight}`);
-    lines.push(`Text style: ${formatStyleRef(spec.styles.text)}`);
+function getFirstSolidPaint(node) {
+  if (!("fills" in node) || !Array.isArray(node.fills)) {
+    return null;
   }
 
-  return lines;
+  return node.fills.find((paint) => paint.type === "SOLID" && paint.visible !== false) || null;
+}
+
+function formatPaintValue(paint) {
+  if (!paint || paint.type !== "SOLID") {
+    return null;
+  }
+
+  const alpha = typeof paint.opacity === "number" ? ` ${formatPercent(paint.opacity)}` : "";
+  return `${rgbToHex(paint.color)}${alpha}`;
+}
+
+function formatPaddingSummary(padding) {
+  if (!padding) {
+    return null;
+  }
+
+  if (padding.top === padding.right && padding.top === padding.bottom && padding.top === padding.left) {
+    return `${padding.top} all`;
+  }
+
+  return `T ${padding.top} / R ${padding.right} / B ${padding.bottom} / L ${padding.left}`;
+}
+
+function hasUsefulValue(value) {
+  return value && value !== "None" && value !== "n/a" && value !== "none";
+}
+
+function formatDisplayEnum(value, fallback = "n/a") {
+  const normalized = formatEnum(value, fallback);
+  return normalized
+    .split("-")
+    .map((part) => `${part.charAt(0).toUpperCase()}${part.slice(1)}`)
+    .join(" ");
 }
 
 function findExistingVisualSpec(sourceNodeId) {
@@ -869,7 +881,7 @@ async function createTextBlock(characters, options) {
   const text = figma.createText();
   await figma.loadFontAsync(text.fontName);
   text.fontSize = options.fontSize;
-  text.characters = characters;
+  text.characters = String(characters);
   text.fills = options.fills;
   text.textAutoResize = "HEIGHT";
   text.resize(options.width, Math.max(text.height, 16));
@@ -883,6 +895,84 @@ async function createTextBlock(characters, options) {
   }
 
   return text;
+}
+
+function createSpecSwatch(color) {
+  const swatch = figma.createRectangle();
+  swatch.resize(12, 12);
+  swatch.cornerRadius = 3;
+  swatch.fills = [{ type: "SOLID", color }];
+  swatch.strokes = [{ type: "SOLID", color: { r: 0.839, g: 0.882, b: 0.867 } }];
+  swatch.strokeWeight = 1;
+  return swatch;
+}
+
+async function createSpecPill(text, color) {
+  const pill = figma.createFrame();
+  const pillWidth = Math.min(Math.max(text.length * 8 + 22, 56), 144);
+  pill.resize(pillWidth, 20);
+  pill.cornerRadius = 999;
+  pill.fills = [{ type: "SOLID", color, opacity: 0.1 }];
+  pill.strokes = [{ type: "SOLID", color, opacity: 0.32 }];
+  pill.strokeWeight = 1;
+  pill.clipsContent = false;
+
+  const label = await createTextBlock(text, {
+    width: pillWidth - 16,
+    fontSize: 11,
+    fills: [{ type: "SOLID", color }]
+  });
+  label.x = 8;
+  label.y = 3;
+  pill.appendChild(label);
+  return pill;
+}
+
+async function createSpecSectionTitle(text) {
+  return createTextBlock(text, {
+    width: SPEC_CARD_WIDTH - SPEC_CARD_PADDING * 2,
+    fontSize: 10,
+    fills: [{ type: "SOLID", color: { r: 0.055, g: 0.486, b: 0.4 } }],
+    letterSpacing: { unit: "PERCENT", value: 10 },
+    textCase: "UPPER"
+  });
+}
+
+async function createSpecRow(label, value, options = {}) {
+  const row = figma.createFrame();
+  row.fills = [];
+  row.strokes = [];
+  row.clipsContent = false;
+
+  const labelNode = await createTextBlock(label, {
+    width: SPEC_CARD_LABEL_WIDTH,
+    fontSize: 11,
+    fills: [{ type: "SOLID", color: { r: 0.349, g: 0.439, b: 0.431 } }]
+  });
+  labelNode.x = 0;
+  labelNode.y = 1;
+  row.appendChild(labelNode);
+
+  let valueX = SPEC_CARD_LABEL_WIDTH + 10;
+  if (options.swatchColor) {
+    const swatch = createSpecSwatch(options.swatchColor);
+    swatch.x = valueX;
+    swatch.y = 2;
+    row.appendChild(swatch);
+    valueX += 18;
+  }
+
+  const valueNode = await createTextBlock(value, {
+    width: SPEC_CARD_WIDTH - SPEC_CARD_PADDING * 2 - valueX,
+    fontSize: 11,
+    fills: [{ type: "SOLID", color: { r: 0.063, g: 0.165, b: 0.165 } }]
+  });
+  valueNode.x = valueX;
+  valueNode.y = 0;
+  row.appendChild(valueNode);
+
+  row.resize(SPEC_CARD_WIDTH - SPEC_CARD_PADDING * 2, Math.max(labelNode.height + 2, valueNode.height, 16));
+  return row;
 }
 
 // Shared plugin data works in local development without a published plugin id.
@@ -908,6 +998,10 @@ async function upsertCanvasSpecCard(target) {
   const card = existingCard || figma.createFrame();
   const innerWidth = SPEC_CARD_WIDTH - SPEC_CARD_PADDING * 2;
   const origin = getCanvasPosition(target);
+  const padding = getPaddingValues(target);
+  const solidFill = getFirstSolidPaint(target);
+  const fillValue = formatPaintValue(solidFill);
+  const hasAutoLayout = "layoutMode" in target && target.layoutMode !== "NONE";
   const eyebrow = await createTextBlock("LIVE SPECS", {
     width: innerWidth,
     fontSize: 11,
@@ -920,11 +1014,62 @@ async function upsertCanvasSpecCard(target) {
     fontSize: 18,
     fills: [{ type: "SOLID", color: { r: 0.063, g: 0.165, b: 0.165 } }]
   });
-  const body = await createTextBlock(buildCanvasSpecLines(spec).join("\n"), {
-    width: innerWidth,
-    fontSize: 12,
-    fills: [{ type: "SOLID", color: { r: 0.224, g: 0.31, b: 0.302 } }]
-  });
+  const typePill = await createSpecPill(spec.type, { r: 0.055, g: 0.486, b: 0.4 });
+  const sections = [
+    {
+      title: "Size & Position",
+      rows: [
+        ["Size", `${formatNumber(spec.width)} x ${formatNumber(spec.height)} px`],
+        ["Position", `${formatNumber(spec.x)}, ${formatNumber(spec.y)} px`],
+        ["Radius", spec.cornerRadius]
+      ]
+    },
+    {
+      title: "Appearance",
+      rows: [
+        fillValue ? ["Fill", fillValue, { swatchColor: solidFill.color }] : ["Fills", spec.fills],
+        hasUsefulValue(spec.strokes) ? ["Stroke", spec.strokes] : null,
+        hasUsefulValue(spec.effects) ? ["Effects", spec.effects] : null
+      ].filter(Boolean)
+    },
+    {
+      title: "Auto Layout",
+      rows: hasAutoLayout
+        ? [
+          ["Direction", formatDisplayEnum(target.layoutMode)],
+          ["Gap", typeof target.itemSpacing === "number" ? `${round(target.itemSpacing)} px` : "n/a"],
+          ["Padding", formatPaddingSummary(padding) || "n/a"],
+          ["Align", "primaryAxisAlignItems" in target ? `${formatDisplayEnum(target.primaryAxisAlignItems)} / ${formatDisplayEnum(target.counterAxisAlignItems)}` : "n/a"],
+          ["Wrap", "layoutWrap" in target ? formatDisplayEnum(target.layoutWrap, "No wrap") : "No wrap"]
+        ]
+        : [["Mode", "None"]]
+    }
+  ];
+
+  const styleRows = [
+    spec.styles.fill ? ["Fill", spec.styles.fill.name] : null,
+    spec.styles.stroke ? ["Stroke", spec.styles.stroke.name] : null,
+    spec.styles.effect ? ["Effect", spec.styles.effect.name] : null,
+    spec.styles.text ? ["Text", spec.styles.text.name] : null
+  ].filter(Boolean);
+
+  if (styleRows.length) {
+    sections.push({
+      title: "Styles",
+      rows: styleRows
+    });
+  }
+
+  if (spec.text) {
+    sections.push({
+      title: "Text",
+      rows: [
+        ["Content", truncate(spec.text.content, 80)],
+        ["Type", `${spec.text.fontName}, ${spec.text.fontSize}`],
+        ["Line", spec.text.lineHeight]
+      ]
+    });
+  }
 
   for (const child of [...card.children]) {
     child.remove();
@@ -953,16 +1098,39 @@ async function upsertCanvasSpecCard(target) {
 
   card.appendChild(eyebrow);
   card.appendChild(title);
-  card.appendChild(body);
+  card.appendChild(typePill);
 
   eyebrow.x = SPEC_CARD_PADDING;
   eyebrow.y = SPEC_CARD_PADDING;
   title.x = SPEC_CARD_PADDING;
   title.y = eyebrow.y + eyebrow.height + 8;
-  body.x = SPEC_CARD_PADDING;
-  body.y = title.y + title.height + 12;
+  typePill.x = SPEC_CARD_PADDING;
+  typePill.y = title.y + title.height + 10;
 
-  card.resize(SPEC_CARD_WIDTH, Math.ceil(body.y + body.height + SPEC_CARD_PADDING));
+  let cursorY = typePill.y + typePill.height + 18;
+  for (const section of sections) {
+    if (!section.rows.length) {
+      continue;
+    }
+
+    const sectionTitle = await createSpecSectionTitle(section.title);
+    sectionTitle.x = SPEC_CARD_PADDING;
+    sectionTitle.y = cursorY;
+    card.appendChild(sectionTitle);
+    cursorY += sectionTitle.height + 7;
+
+    for (const row of section.rows) {
+      const rowNode = await createSpecRow(row[0], row[1], row[2] || {});
+      rowNode.x = SPEC_CARD_PADDING;
+      rowNode.y = cursorY;
+      card.appendChild(rowNode);
+      cursorY += rowNode.height + 5;
+    }
+
+    cursorY += 10;
+  }
+
+  card.resize(SPEC_CARD_WIDTH, Math.ceil(cursorY + SPEC_CARD_PADDING - 6));
   card.x = origin.x + target.width + SPEC_CARD_GAP;
   card.y = origin.y;
 
