@@ -289,7 +289,8 @@ Select one or more layers in Figma to generate specs.</pre>
         markdown: "",
         json: "",
         canPlace: false,
-        placeMessage: ""
+        placeMessage: "",
+        runtimeError: ""
       };
 
       const summary = document.getElementById("summary");
@@ -341,6 +342,9 @@ Select one or more layers in Figma to generate specs.</pre>
             <div class="spec-row"><label>Line</label><div>${escapeHtml(layer.text.lineHeight)} / ${escapeHtml(layer.text.letterSpacing)}</div></div>
           `
           : "";
+        const errorRow = layer.error
+          ? `<div class="spec-row"><label>Error</label><div>${escapeHtml(layer.error)}</div></div>`
+          : "";
 
         return `
           <article class="card">
@@ -355,6 +359,7 @@ Select one or more layers in Figma to generate specs.</pre>
               <div class="spec-row"><label>Fills</label><div>${escapeHtml(layer.fills)}</div></div>
               <div class="spec-row"><label>Strokes</label><div>${escapeHtml(layer.strokes)}</div></div>
               <div class="spec-row"><label>Effects</label><div>${escapeHtml(layer.effects)}</div></div>
+              ${errorRow}
               ${styleRows}
               ${textRows}
             </div>
@@ -370,6 +375,7 @@ Select one or more layers in Figma to generate specs.</pre>
         state.json = payload.json || "";
         state.canPlace = Boolean(payload.canPlace);
         state.placeMessage = payload.placeMessage || "";
+        state.runtimeError = payload.runtimeError || "";
 
         selectionCount.textContent = `${payload.selectedCount} layer${payload.selectedCount === 1 ? "" : "s"} selected`;
         generatedAt.textContent = payload.selectedCount
@@ -377,7 +383,9 @@ Select one or more layers in Figma to generate specs.</pre>
           : "Waiting for selection";
         placeButton.disabled = !state.canPlace;
         placeButton.style.opacity = state.canPlace ? "1" : "0.45";
-        placeStatus.textContent = state.placeMessage;
+        placeStatus.textContent = state.runtimeError
+          ? `${state.placeMessage} Last error: ${state.runtimeError}`
+          : state.placeMessage;
 
         if (!state.layers.length) {
           summary.className = "empty";

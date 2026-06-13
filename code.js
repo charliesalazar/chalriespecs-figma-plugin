@@ -19,17 +19,38 @@ const VISUAL_SPEC_ROLE = "visual-spec";
 const VISUAL_SPEC_ROLE_KEY = "role";
 const VISUAL_SPEC_SOURCE_KEY = "source-node-id";
 const VISUAL_SPEC_PADDING = 12;
+let lastRuntimeError = "";
 
 function round(value) {
   return Math.round(value * 100) / 100;
+}
+
+function formatError(error) {
+  return error && error.message ? error.message : String(error);
+}
+
+function setRuntimeError(error) {
+  lastRuntimeError = formatError(error);
+}
+
+function clearRuntimeError() {
+  lastRuntimeError = "";
 }
 
 function isMixed(value) {
   return value === figma.mixed;
 }
 
+function formatEnum(value, fallback = "mixed") {
+  return typeof value === "string" ? value.toLowerCase().replace(/_/g, "-") : fallback;
+}
+
+function formatRawNumber(value, fallback = "mixed") {
+  return typeof value === "number" ? round(value) : fallback;
+}
+
 function formatPercent(value) {
-  return `${round(value * 100)}%`;
+  return typeof value === "number" ? `${round(value * 100)}%` : "mixed";
 }
 
 function formatNumber(value) {
@@ -64,6 +85,10 @@ function getStyleReference(styleId) {
 }
 
 function rgbToHex(color) {
+  if (!color || typeof color.r !== "number" || typeof color.g !== "number" || typeof color.b !== "number") {
+    return "#000000";
+  }
+
   const toChannel = (channel) =>
     Math.round(channel * 255)
       .toString(16)
@@ -96,9 +121,11 @@ function describePaint(paint) {
   }
 
   if (paint.type.indexOf("GRADIENT_") === 0) {
-    const stops = paint.gradientStops
+    const stops = Array.isArray(paint.gradientStops)
+      ? paint.gradientStops
       .map((stop) => `${rgbToHex(stop.color)} ${round(stop.position * 100)}%`)
-      .join(", ");
+      .join(", ")
+      : "no stops";
     return `${paint.type.replace("GRADIENT_", "Gradient ").toLowerCase()} (${stops})`;
   }
 
@@ -115,6 +142,10 @@ function describePaintList(paints) {
 }
 
 function formatBoxShadowColor(color, opacity) {
+  if (!color || typeof color.r !== "number" || typeof color.g !== "number" || typeof color.b !== "number") {
+    return "rgba(0, 0, 0, 1)";
+  }
+
   const red = Math.round(color.r * 255);
   const green = Math.round(color.g * 255);
   const blue = Math.round(color.b * 255);
@@ -131,11 +162,17 @@ function describeEffects(effects) {
     .filter((effect) => effect.visible !== false)
     .map((effect) => {
       if (effect.type === "DROP_SHADOW" || effect.type === "INNER_SHADOW") {
-        return `${effect.type.toLowerCase().replace(/_/g, " ")} ${round(effect.offset.x)}, ${round(effect.offset.y)}, blur ${round(effect.radius)}, spread ${round(effect.spread || 0)}, ${formatBoxShadowColor(effect.color, effect.color.a)}`;
+        const offsetX = effect.offset && typeof effect.offset.x === "number" ? round(effect.offset.x) : 0;
+        const offsetY = effect.offset && typeof effect.offset.y === "number" ? round(effect.offset.y) : 0;
+        const radius = typeof effect.radius === "number" ? round(effect.radius) : 0;
+        const spread = typeof effect.spread === "number" ? round(effect.spread) : 0;
+        const opacity = effect.color && typeof effect.color.a === "number" ? effect.color.a : 1;
+        return `${effect.type.toLowerCase().replace(/_/g, " ")} ${offsetX}, ${offsetY}, blur ${radius}, spread ${spread}, ${formatBoxShadowColor(effect.color, opacity)}`;
       }
 
       if (effect.type === "LAYER_BLUR" || effect.type === "BACKGROUND_BLUR") {
-        return `${effect.type.toLowerCase().replace(/_/g, " ")} ${round(effect.radius)}`;
+        const radius = typeof effect.radius === "number" ? round(effect.radius) : 0;
+        return `${effect.type.toLowerCase().replace(/_/g, " ")} ${radius}`;
       }
 
       return effect.type;
@@ -155,19 +192,19 @@ function describeConstraints(node) {
 function describeLayoutSizing(node) {
   const parts = [];
 
-  if ("layoutSizingHorizontal" in node) {
+  if ("layoutSizingHorizontal" in node && typeof node.layoutSizingHorizontal === "string") {
     parts.push(`horizontal ${node.layoutSizingHorizontal.toLowerCase()}`);
   }
 
-  if ("layoutSizingVertical" in node) {
+  if ("layoutSizingVertical" in node && typeof node.layoutSizingVertical === "string") {
     parts.push(`vertical ${node.layoutSizingVertical.toLowerCase()}`);
   }
 
-  if ("layoutAlign" in node && node.layoutAlign) {
+  if ("layoutAlign" in node && typeof node.layoutAlign === "string") {
     parts.push(`align ${node.layoutAlign.toLowerCase()}`);
   }
 
-  if ("layoutGrow" in node) {
+  if ("layoutGrow" in node && typeof node.layoutGrow === "number") {
     parts.push(`grow ${node.layoutGrow}`);
   }
 
@@ -181,18 +218,23 @@ function describeAutoLayout(node) {
 
   const axis = node.layoutMode === "HORIZONTAL" ? "Horizontal" : "Vertical";
   const padding = [node.paddingTop, node.paddingRight, node.paddingBottom, node.paddingLeft]
-    .map((value) => round(value))
+    .map((value) => formatRawNumber(value))
     .join(" / ");
-  const alignment = `${node.primaryAxisAlignItems.toLowerCase()} / ${node.counterAxisAlignItems.toLowerCase()}`;
-  const gap = round(node.itemSpacing);
-  const wrap = "layoutWrap" in node ? node.layoutWrap.toLowerCase() : "no-wrap";
+  const alignment = `${formatEnum(node.primaryAxisAlignItems)} / ${formatEnum(node.counterAxisAlignItems)}`;
+  const gap = formatRawNumber(node.itemSpacing);
+  const wrap = "layoutWrap" in node ? formatEnum(node.layoutWrap, "no-wrap") : "no-wrap";
 
   return `${axis}, gap ${gap}, padding ${padding}, align ${alignment}, ${wrap}`;
 }
 
 function describeCornerRadius(node) {
   if ("topLeftRadius" in node && "topRightRadius" in node && "bottomRightRadius" in node && "bottomLeftRadius" in node) {
-    const values = [node.topLeftRadius, node.topRightRadius, node.bottomRightRadius, node.bottomLeftRadius].map((value) => round(value));
+    const rawValues = [node.topLeftRadius, node.topRightRadius, node.bottomRightRadius, node.bottomLeftRadius];
+    if (rawValues.some((value) => typeof value !== "number")) {
+      return "mixed";
+    }
+
+    const values = rawValues.map((value) => round(value));
     if (values.every((value) => value === values[0])) {
       return `${values[0]} px`;
     }
@@ -201,7 +243,7 @@ function describeCornerRadius(node) {
   }
 
   if ("cornerRadius" in node) {
-    return isMixed(node.cornerRadius) ? "mixed" : `${round(node.cornerRadius)} px`;
+    return typeof node.cornerRadius === "number" ? `${round(node.cornerRadius)} px` : "mixed";
   }
 
   return "n/a";
@@ -221,11 +263,15 @@ function describeText(node) {
       ? "mixed"
       : node.lineHeight.unit === "AUTO"
         ? "auto"
-        : `${round(node.lineHeight.value)} ${node.lineHeight.unit.toLowerCase()}`;
+        : typeof node.lineHeight.value === "number" && typeof node.lineHeight.unit === "string"
+          ? `${round(node.lineHeight.value)} ${node.lineHeight.unit.toLowerCase()}`
+          : "mixed";
   const letterSpacing =
     isMixed(node.letterSpacing) || node.letterSpacing === figma.mixed
       ? "mixed"
-      : `${round(node.letterSpacing.value)} ${node.letterSpacing.unit.toLowerCase()}`;
+      : typeof node.letterSpacing.value === "number" && typeof node.letterSpacing.unit === "string"
+        ? `${round(node.letterSpacing.value)} ${node.letterSpacing.unit.toLowerCase()}`
+        : "mixed";
 
   return {
     content: node.characters,
@@ -233,10 +279,10 @@ function describeText(node) {
     fontSize,
     lineHeight,
     letterSpacing,
-    textCase: node.textCase.toLowerCase(),
-    textDecoration: node.textDecoration.toLowerCase(),
-    horizontalAlign: node.textAlignHorizontal.toLowerCase(),
-    verticalAlign: node.textAlignVertical.toLowerCase()
+    textCase: formatEnum(node.textCase),
+    textDecoration: formatEnum(node.textDecoration),
+    horizontalAlign: formatEnum(node.textAlignHorizontal),
+    verticalAlign: formatEnum(node.textAlignVertical)
   };
 }
 
@@ -291,12 +337,12 @@ function collectNodeSpec(node, index) {
     type: node.type,
     visible: node.visible,
     locked: "locked" in node ? node.locked : false,
-    width: "width" in node ? round(node.width) : null,
-    height: "height" in node ? round(node.height) : null,
-    x: "x" in node ? round(node.x) : null,
-    y: "y" in node ? round(node.y) : null,
-    rotation: "rotation" in node ? round(node.rotation) : null,
-    opacity: "opacity" in node ? round(node.opacity) : 1,
+    width: typeof node.width === "number" ? round(node.width) : null,
+    height: typeof node.height === "number" ? round(node.height) : null,
+    x: typeof node.x === "number" ? round(node.x) : null,
+    y: typeof node.y === "number" ? round(node.y) : null,
+    rotation: typeof node.rotation === "number" ? round(node.rotation) : null,
+    opacity: typeof node.opacity === "number" ? round(node.opacity) : 1,
     constraints: describeConstraints(node),
     sizing: describeLayoutSizing(node),
     autoLayout: describeAutoLayout(node),
@@ -310,6 +356,40 @@ function collectNodeSpec(node, index) {
   };
 
   return spec;
+}
+
+function collectNodeSpecSafely(node, index) {
+  try {
+    return collectNodeSpec(node, index);
+  } catch (error) {
+    setRuntimeError(error);
+    return {
+      id: node.id,
+      order: index + 1,
+      name: node.name || "Unknown layer",
+      path: buildNodePath(node),
+      type: node.type,
+      visible: "visible" in node ? node.visible : true,
+      locked: "locked" in node ? node.locked : false,
+      width: typeof node.width === "number" ? round(node.width) : null,
+      height: typeof node.height === "number" ? round(node.height) : null,
+      x: typeof node.x === "number" ? round(node.x) : null,
+      y: typeof node.y === "number" ? round(node.y) : null,
+      rotation: null,
+      opacity: 1,
+      constraints: "n/a",
+      sizing: "n/a",
+      autoLayout: "n/a",
+      cornerRadius: "n/a",
+      fills: "Could not read",
+      strokes: "Could not read",
+      strokeWeight: "n/a",
+      effects: "Could not read",
+      styles: {},
+      text: null,
+      error: formatError(error)
+    };
+  }
 }
 
 function formatStyleLine(label, styleRef) {
@@ -541,10 +621,18 @@ async function createPillLabel(text, color) {
 }
 
 function findChildByType(node, type) {
+  if (!("findOne" in node) || typeof node.findOne !== "function") {
+    return null;
+  }
+
   return node.findOne((child) => child.type === type);
 }
 
 function findNodeByName(node, needle) {
+  if (!("findOne" in node) || typeof node.findOne !== "function") {
+    return null;
+  }
+
   const lowerNeedle = needle.toLowerCase();
   return node.findOne((child) => child.name.toLowerCase().includes(lowerNeedle));
 }
@@ -583,7 +671,12 @@ function getRelativeRect(node, ancestor) {
 }
 
 function getPaddingValues(node) {
-  if (!("paddingTop" in node)) {
+  if (
+    typeof node.paddingTop !== "number" ||
+    typeof node.paddingRight !== "number" ||
+    typeof node.paddingBottom !== "number" ||
+    typeof node.paddingLeft !== "number"
+  ) {
     return null;
   }
 
@@ -883,7 +976,7 @@ async function upsertCanvasSpecCard(target) {
 function sendSelectionSpecs() {
   const selectionState = getSelectionState();
   const selection = figma.currentPage.selection;
-  const layers = selection.map(collectNodeSpec);
+  const layers = selection.map(collectNodeSpecSafely);
   const generatedAt = new Date().toISOString();
 
   figma.ui.postMessage({
@@ -895,7 +988,8 @@ function sendSelectionSpecs() {
       markdown: buildMarkdown(layers),
       json: JSON.stringify(buildJsonPayload(layers, generatedAt), null, 2),
       canPlace: selectionState.canPlace,
-      placeMessage: selectionState.message
+      placeMessage: selectionState.message,
+      runtimeError: lastRuntimeError
     }
   });
 }
@@ -913,9 +1007,20 @@ figma.on("selectionchange", () => {
   }
 
   // If a card already exists for this node, keep it synced while the plugin is open.
-  upsertCanvasSpecCard(selectionState.target).catch(() => {});
+  upsertCanvasSpecCard(selectionState.target)
+    .then(() => {
+      clearRuntimeError();
+      sendSelectionSpecs();
+    })
+    .catch((error) => {
+      setRuntimeError(error);
+      sendSelectionSpecs();
+    });
   if (findExistingVisualSpec(selectionState.target.id)) {
-    upsertVisualSpecOverlay(selectionState.target).catch(() => {});
+    upsertVisualSpecOverlay(selectionState.target).catch((error) => {
+      setRuntimeError(error);
+      sendSelectionSpecs();
+    });
   }
 });
 
@@ -944,12 +1049,15 @@ figma.ui.onmessage = (message) => {
         return upsertVisualSpecOverlay(selectionState.target, card).then((overlay) => ({ card, overlay }));
       })
       .then(({ card, overlay }) => {
+        clearRuntimeError();
         figma.viewport.scrollAndZoomIntoView([selectionState.target, card, overlay]);
         figma.notify(`Specs placed beside "${selectionState.target.name}".`);
         sendSelectionSpecs();
       })
       .catch((error) => {
+        setRuntimeError(error);
         figma.notify(`Could not place specs: ${error.message}`, { error: true });
+        sendSelectionSpecs();
       });
   }
 
