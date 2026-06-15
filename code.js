@@ -617,18 +617,19 @@ async function createVisualLabel(text, x, y, color, width = 84) {
 
 async function createPillLabel(text, color) {
   const pill = figma.createFrame();
+  const pillWidth = Math.min(Math.max(text.length * 8 + 24, 96), 150);
   pill.fills = [];
   pill.strokes = [{ type: "SOLID", color }];
   pill.strokeWeight = 1;
   pill.cornerRadius = 999;
   pill.clipsContent = false;
+  pill.resize(pillWidth, 24);
 
-  const label = await createVisualText(text, 140, 12, color);
+  const label = await createVisualText(text, pillWidth - 24, 12, color);
   label.x = 12;
   label.y = 5;
 
   pill.appendChild(label);
-  pill.resize(Math.ceil(label.width + 24), 24);
   return pill;
 }
 
@@ -732,6 +733,8 @@ async function upsertVisualSpecOverlay(target, specCard = null) {
   const strokeColor = { r: 0.97, g: 0.37, b: 0.29 };
   const textColor = { r: 0.53, g: 0.37, b: 0.92 };
   const sizeColor = { r: 0.33, g: 0.78, b: 0.73 };
+  const radiusColor = { r: 0.98, g: 0.5, b: 0.18 };
+  const cornerRadius = describeCornerRadius(target);
 
   removeChildren(overlay);
 
@@ -751,6 +754,14 @@ async function upsertVisualSpecOverlay(target, specCard = null) {
   overlay.appendChild(await createVisualLabel(`${Math.round(target.width)} px`, targetGuideX + Math.max(target.width / 2 - 24, 0), widthGuideY - 16, sizeColor, 70));
   overlay.appendChild(await createVisualLabel(`${Math.round(target.height)} px`, targetGuideX - 60, heightGuideY + Math.max(target.height / 2 - 8, 0), sizeColor, 70));
   overlay.appendChild(await createVisualLabel(target.name, targetGuideX, widthGuideY - 28, { r: 0.39, g: 0.54, b: 0.98 }, 140));
+  if (cornerRadius !== "n/a") {
+    const radiusLabelX = targetGuideX;
+    const radiusLabelY = targetLocalY + target.height + 36;
+    overlay.appendChild(await createVisualLabel(`Corner radius ${cornerRadius}`, radiusLabelX, radiusLabelY, radiusColor, 132));
+    overlay.appendChild(createVisualBand(targetGuideX + target.width - 20, targetLocalY + 8, 20, 2, radiusColor, 1));
+    overlay.appendChild(createVisualBand(targetGuideX + target.width - 2, targetLocalY + 8, 2, 20, radiusColor, 1));
+    overlay.appendChild(createVisualBand(targetGuideX + target.width - 2, targetLocalY + 28, 2, Math.max(radiusLabelY - targetLocalY - 28, 8), radiusColor, 1));
+  }
 
   const createStudyFrame = async (title, color, x) => {
     const frame = figma.createFrame();
@@ -1021,7 +1032,7 @@ async function upsertCanvasSpecCard(target) {
       rows: [
         ["Size", `${formatNumber(spec.width)} x ${formatNumber(spec.height)} px`],
         ["Position", `${formatNumber(spec.x)}, ${formatNumber(spec.y)} px`],
-        ["Radius", spec.cornerRadius]
+        ["Corner radius", spec.cornerRadius]
       ]
     },
     {
