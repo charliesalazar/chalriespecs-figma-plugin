@@ -710,9 +710,9 @@ async function upsertVisualSpecOverlay(target, specCard = null) {
   const isText = target.type === "TEXT";
   const textNode = isText ? target : findChildByType(target, "TEXT");
   const iconNode = findNodeByName(target, "pizza icon");
-  const studyWidth = Math.max(target.width + 92, 220);
-  const studyHeight = Math.max(target.height + 144, 200);
-  const studyGap = 28;
+  const studyWidth = Math.max(target.width + 72, 184);
+  const studyHeight = Math.max(target.height + 112, 160);
+  const studyGap = 20;
   const topMargin = 108;
   const bottomMargin = 40;
   const leftMargin = 32;
@@ -722,7 +722,7 @@ async function upsertVisualSpecOverlay(target, specCard = null) {
   const overlayX = origin.x - leftMargin;
   const overlayY = origin.y - topMargin;
   const cardLocalBottom = card ? card.y - (origin.y - topMargin) + card.height : topMargin + target.height;
-  const studyY = Math.max(cardLocalBottom + 72, topMargin + target.height + 220);
+  const studyY = Math.max(cardLocalBottom + 36, topMargin + target.height + 168);
   const rowWidth = studyWidth * 3 + studyGap * 2;
   const targetGuideX = leftMargin;
   const studyStartX = Math.max(targetGuideX + target.width + 220, leftMargin + 240);
@@ -756,11 +756,11 @@ async function upsertVisualSpecOverlay(target, specCard = null) {
   overlay.appendChild(await createVisualLabel(target.name, targetGuideX, widthGuideY - 28, { r: 0.39, g: 0.54, b: 0.98 }, 140));
   if (cornerRadius !== "n/a") {
     const radiusLabelX = targetGuideX;
-    const radiusLabelY = targetLocalY + target.height + 36;
+    const radiusLabelY = targetLocalY + target.height + 24;
     overlay.appendChild(await createVisualLabel(`Corner radius ${cornerRadius}`, radiusLabelX, radiusLabelY, radiusColor, 132));
     overlay.appendChild(createVisualBand(targetGuideX + target.width - 20, targetLocalY + 8, 20, 2, radiusColor, 1));
     overlay.appendChild(createVisualBand(targetGuideX + target.width - 2, targetLocalY + 8, 2, 20, radiusColor, 1));
-    overlay.appendChild(createVisualBand(targetGuideX + target.width - 2, targetLocalY + 28, 2, Math.max(radiusLabelY - targetLocalY - 28, 8), radiusColor, 1));
+    overlay.appendChild(createVisualBand(targetGuideX + target.width - 2, targetLocalY + 28, 2, 22, radiusColor, 1));
   }
 
   const createStudyFrame = async (title, color, x) => {
@@ -774,7 +774,7 @@ async function upsertVisualSpecOverlay(target, specCard = null) {
     frame.x = x;
     frame.y = studyY;
     const pill = await createPillLabel(title, color);
-    pill.x = 24;
+    pill.x = 18;
     pill.y = 12;
     frame.appendChild(pill);
     return frame;
@@ -782,8 +782,8 @@ async function upsertVisualSpecOverlay(target, specCard = null) {
 
   const createStudyClone = (frame) => {
     const clone = target.clone();
-    clone.x = Math.max((studyWidth - target.width) / 2, 24);
-    clone.y = 68;
+    clone.x = Math.max((studyWidth - target.width) / 2, 20);
+    clone.y = 58;
     frame.appendChild(clone);
     return clone;
   };
@@ -828,10 +828,10 @@ async function upsertVisualSpecOverlay(target, specCard = null) {
     paddingFrame.appendChild(bottomBand);
     paddingFrame.appendChild(leftBand);
 
-    const topLabel = await createVisualLabel(`T ${padding.top}`, paddingClone.x + Math.max(paddingClone.width / 2 - 18, 0), 44, paddingColor, 54);
+    const topLabel = await createVisualLabel(`T ${padding.top}`, paddingClone.x + Math.max(paddingClone.width / 2 - 18, 0), 40, paddingColor, 54);
     const leftLabel = await createVisualLabel(`L ${padding.left}`, 8, paddingClone.y + Math.max(paddingClone.height / 2 - 10, 0), paddingColor, 54);
     const rightLabel = await createVisualLabel(`R ${padding.right}`, paddingClone.x + paddingClone.width + 8, paddingClone.y + Math.max(paddingClone.height / 2 - 10, 0), paddingColor, 54);
-    const bottomLabel = await createVisualLabel(`B ${padding.bottom}`, paddingClone.x + Math.max(paddingClone.width / 2 - 18, 0), paddingClone.y + paddingClone.height + 18, paddingColor, 54);
+    const bottomLabel = await createVisualLabel(`B ${padding.bottom}`, paddingClone.x + Math.max(paddingClone.width / 2 - 18, 0), paddingClone.y + paddingClone.height + 14, paddingColor, 54);
     paddingFrame.appendChild(topLabel);
     paddingFrame.appendChild(leftLabel);
     paddingFrame.appendChild(rightLabel);
