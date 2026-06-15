@@ -616,6 +616,22 @@ function createVisualBand(x, y, width, height, color, opacity) {
   return band;
 }
 
+function createVisualSurface(x, y, width, height, options) {
+  const surface = figma.createFrame();
+  surface.x = x;
+  surface.y = y;
+  surface.resize(width, height);
+  surface.fills = [{ type: "SOLID", color: options.fill }];
+  surface.strokes = [{ type: "SOLID", color: options.stroke }];
+  surface.strokeWeight = options.strokeWeight || 1;
+  surface.cornerRadius = options.cornerRadius || 0;
+  surface.clipsContent = false;
+  if (options.effects) {
+    surface.effects = options.effects;
+  }
+  return surface;
+}
+
 async function createVisualLabel(text, x, y, color, width = 84) {
   const label = await createVisualText(text, width, 12, color);
   label.x = x;
@@ -624,10 +640,28 @@ async function createVisualLabel(text, x, y, color, width = 84) {
   return label;
 }
 
-async function createPillLabel(text, color) {
+async function createVisualChip(text, x, y, color, fillColor, width = 88) {
+  const chip = figma.createFrame();
+  chip.x = x;
+  chip.y = y;
+  chip.resize(width, 24);
+  chip.cornerRadius = 999;
+  chip.fills = [{ type: "SOLID", color: fillColor }];
+  chip.strokes = [{ type: "SOLID", color, opacity: 0.45 }];
+  chip.strokeWeight = 1;
+  chip.clipsContent = false;
+
+  const label = await createVisualText(text, width - 18, 12, color);
+  label.x = 9;
+  label.y = 4;
+  chip.appendChild(label);
+  return chip;
+}
+
+async function createPillLabel(text, color, fillColor = null) {
   const pill = figma.createFrame();
   const pillWidth = Math.min(Math.max(text.length * 8 + 24, 96), 150);
-  pill.fills = [];
+  pill.fills = fillColor ? [{ type: "SOLID", color: fillColor }] : [];
   pill.strokes = [{ type: "SOLID", color }];
   pill.strokeWeight = 1;
   pill.cornerRadius = 999;
@@ -740,10 +774,14 @@ async function upsertVisualSpecOverlay(target, specCard = null) {
   const overlayWidth = Math.max(targetGuideX + target.width + leftMargin, cardRight + leftMargin, studyStartX + rowWidth + leftMargin);
   const overlayHeight = studyY + studyHeight + bottomMargin;
   const paddingColor = { r: 0.98, g: 0.72, b: 0.34 };
+  const paddingFill = { r: 1, g: 0.97, b: 0.9 };
   const strokeColor = { r: 0.97, g: 0.37, b: 0.29 };
+  const strokeFill = { r: 1, g: 0.94, b: 0.93 };
   const textColor = { r: 0.53, g: 0.37, b: 0.92 };
+  const textFill = { r: 0.96, g: 0.94, b: 1 };
   const sizeColor = { r: 0.33, g: 0.78, b: 0.73 };
   const radiusColor = { r: 0.98, g: 0.5, b: 0.18 };
+  const radiusFill = { r: 1, g: 0.95, b: 0.88 };
   const cornerRadius = describeCornerRadius(target);
 
   removeChildren(overlay);
@@ -756,6 +794,7 @@ async function upsertVisualSpecOverlay(target, specCard = null) {
   overlay.resize(Math.max(overlayWidth, 1), Math.max(overlayHeight, 1));
   overlay.fills = [];
   overlay.strokes = [];
+  overlay.effects = [];
   overlay.clipsContent = false;
   overlay.opacity = 1;
 
@@ -765,24 +804,32 @@ async function upsertVisualSpecOverlay(target, specCard = null) {
   overlay.appendChild(await createVisualLabel(`${Math.round(target.height)} px`, targetGuideX - 60, heightGuideY + Math.max(target.height / 2 - 8, 0), sizeColor, 70));
   overlay.appendChild(await createVisualLabel(target.name, targetGuideX, widthGuideY - 28, { r: 0.39, g: 0.54, b: 0.98 }, 140));
   if (cornerRadius !== "n/a") {
-    const radiusLabelX = targetGuideX + Math.max(target.width - 76, 0);
-    const radiusLabelY = targetLocalY + target.height + 10;
-    overlay.appendChild(createVisualBand(targetGuideX + target.width - 20, targetLocalY + target.height - 2, 20, 2, radiusColor, 1));
-    overlay.appendChild(createVisualBand(targetGuideX + target.width - 2, targetLocalY + target.height - 20, 2, 20, radiusColor, 1));
-    overlay.appendChild(await createVisualLabel(`Radius ${cornerRadius}`, radiusLabelX, radiusLabelY, radiusColor, 84));
+    const radiusLabelX = targetGuideX + Math.max(target.width - 82, 0);
+    const radiusLabelY = targetLocalY + target.height + 8;
+    overlay.appendChild(createVisualBand(targetGuideX + target.width - 24, targetLocalY + target.height - 3, 24, 3, radiusColor, 1));
+    overlay.appendChild(createVisualBand(targetGuideX + target.width - 3, targetLocalY + target.height - 24, 3, 24, radiusColor, 1));
+    overlay.appendChild(await createVisualChip(`Radius ${cornerRadius}`, radiusLabelX, radiusLabelY, radiusColor, radiusFill, 94));
   }
 
-  const createStudyFrame = async (title, color, x) => {
-    const frame = figma.createFrame();
-    frame.fills = [];
-    frame.strokes = [{ type: "SOLID", color }];
-    frame.strokeWeight = 1;
-    frame.cornerRadius = 16;
-    frame.clipsContent = false;
-    frame.resize(studyWidth, studyHeight);
-    frame.x = x;
-    frame.y = studyY;
-    const pill = await createPillLabel(title, color);
+  const createStudyFrame = async (title, color, fill, x) => {
+    const frame = createVisualSurface(x, studyY, studyWidth, studyHeight, {
+      fill,
+      stroke: color,
+      strokeWeight: 1,
+      cornerRadius: 16,
+      effects: [
+        {
+          type: "DROP_SHADOW",
+          color: { r: 0.071, g: 0.145, b: 0.133, a: 0.08 },
+          offset: { x: 0, y: 8 },
+          radius: 18,
+          spread: 0,
+          visible: true,
+          blendMode: "NORMAL"
+        }
+      ]
+    });
+    const pill = await createPillLabel(title, color, { r: 1, g: 1, b: 1 });
     pill.x = Math.max((studyWidth - pill.width) / 2, 12);
     pill.y = 12;
     frame.appendChild(pill);
@@ -797,9 +844,9 @@ async function upsertVisualSpecOverlay(target, specCard = null) {
     return clone;
   };
 
-  const paddingFrame = await createStudyFrame("Padding only", paddingColor, studyStartX);
-  const strokeFrame = await createStudyFrame("Stroke only", strokeColor, studyStartX + studyWidth + studyGap);
-  const textFrame = await createStudyFrame("Text only", textColor, studyStartX + (studyWidth + studyGap) * 2);
+  const paddingFrame = await createStudyFrame("Padding only", paddingColor, paddingFill, studyStartX);
+  const strokeFrame = await createStudyFrame("Stroke only", strokeColor, strokeFill, studyStartX + studyWidth + studyGap);
+  const textFrame = await createStudyFrame("Text only", textColor, textFill, studyStartX + (studyWidth + studyGap) * 2);
 
   overlay.appendChild(paddingFrame);
   overlay.appendChild(strokeFrame);
