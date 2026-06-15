@@ -773,8 +773,8 @@ async function upsertVisualSpecOverlay(target, specCard = null) {
   const cardRight = card ? card.x - overlayX + card.width : targetGuideX + target.width;
   const overlayWidth = Math.max(targetGuideX + target.width + leftMargin, cardRight + leftMargin, studyStartX + rowWidth + leftMargin);
   const overlayHeight = studyY + studyHeight + bottomMargin;
-  const paddingColor = { r: 0.98, g: 0.72, b: 0.34 };
-  const paddingFill = { r: 1, g: 0.97, b: 0.9 };
+  const paddingColor = { r: 0.86, g: 0.45, b: 0.08 };
+  const paddingFill = { r: 0.98, g: 0.92, b: 0.78 };
   const strokeColor = { r: 0.97, g: 0.37, b: 0.29 };
   const strokeFill = { r: 1, g: 0.94, b: 0.93 };
   const textColor = { r: 0.53, g: 0.37, b: 0.92 };
@@ -805,11 +805,11 @@ async function upsertVisualSpecOverlay(target, specCard = null) {
   overlay.appendChild(await createVisualLabel(`${Math.round(target.height)} px`, Math.max(heightGuideX - 58, 4), heightGuideY + Math.max(target.height / 2 - 8, 0), sizeColor, 70));
   overlay.appendChild(await createVisualLabel(target.name, targetGuideX, widthGuideY - 28, { r: 0.39, g: 0.54, b: 0.98 }, 140));
   if (cornerRadius !== "n/a") {
-    const radiusLabelX = targetGuideX + Math.max(target.width - 76, 0);
+    const radiusGuideX = targetGuideX + target.width + 8;
+    const radiusLabelX = radiusGuideX - 8;
     const radiusLabelY = targetLocalY + target.height + 8;
-    overlay.appendChild(createVisualBand(targetGuideX + target.width - 26, targetLocalY, 26, 3, radiusColor, 1));
-    overlay.appendChild(createVisualBand(targetGuideX + target.width - 3, targetLocalY, 3, 26, radiusColor, 1));
-    overlay.appendChild(createVisualBand(targetGuideX + target.width - 16, targetLocalY + 26, 3, 18, radiusColor, 1));
+    overlay.appendChild(createVisualBand(radiusGuideX, targetLocalY, 28, 3, radiusColor, 1));
+    overlay.appendChild(createVisualBand(radiusGuideX, targetLocalY, 3, 34, radiusColor, 1));
     overlay.appendChild(await createVisualChip(`Radius ${cornerRadius}`, radiusLabelX, radiusLabelY, radiusColor, radiusFill, 94));
   }
 
@@ -849,6 +849,7 @@ async function upsertVisualSpecOverlay(target, specCard = null) {
   const paddingFrame = await createStudyFrame("Padding only", paddingColor, paddingFill, studyStartX);
   const strokeFrame = await createStudyFrame("Stroke only", strokeColor, strokeFill, studyStartX + studyWidth + studyGap);
   const textFrame = await createStudyFrame("Text only", textColor, textFill, studyStartX + (studyWidth + studyGap) * 2);
+  paddingFrame.strokeWeight = 1.5;
 
   overlay.appendChild(paddingFrame);
   overlay.appendChild(strokeFrame);
@@ -859,14 +860,14 @@ async function upsertVisualSpecOverlay(target, specCard = null) {
   const textClone = createStudyClone(textFrame);
 
   if (padding) {
-    const topBand = createVisualBand(paddingClone.x, paddingClone.y, paddingClone.width, padding.top, paddingColor, 0.42);
+    const topBand = createVisualBand(paddingClone.x, paddingClone.y, paddingClone.width, padding.top, paddingColor, 0.58);
     const rightBand = createVisualBand(
       paddingClone.x + Math.max(paddingClone.width - padding.right, 0),
       paddingClone.y,
       padding.right,
       paddingClone.height,
       paddingColor,
-      0.42
+      0.58
     );
     const bottomBand = createVisualBand(
       paddingClone.x,
@@ -874,13 +875,13 @@ async function upsertVisualSpecOverlay(target, specCard = null) {
       paddingClone.width,
       padding.bottom,
       paddingColor,
-      0.42
+      0.58
     );
-    const leftBand = createVisualBand(paddingClone.x, paddingClone.y, padding.left, paddingClone.height, paddingColor, 0.42);
-    topBand.strokes = [{ type: "SOLID", color: paddingColor, opacity: 0.65 }];
-    rightBand.strokes = [{ type: "SOLID", color: paddingColor, opacity: 0.65 }];
-    bottomBand.strokes = [{ type: "SOLID", color: paddingColor, opacity: 0.65 }];
-    leftBand.strokes = [{ type: "SOLID", color: paddingColor, opacity: 0.65 }];
+    const leftBand = createVisualBand(paddingClone.x, paddingClone.y, padding.left, paddingClone.height, paddingColor, 0.58);
+    topBand.strokes = [{ type: "SOLID", color: paddingColor, opacity: 0.8 }];
+    rightBand.strokes = [{ type: "SOLID", color: paddingColor, opacity: 0.8 }];
+    bottomBand.strokes = [{ type: "SOLID", color: paddingColor, opacity: 0.8 }];
+    leftBand.strokes = [{ type: "SOLID", color: paddingColor, opacity: 0.8 }];
     paddingFrame.appendChild(topBand);
     paddingFrame.appendChild(rightBand);
     paddingFrame.appendChild(bottomBand);
@@ -978,7 +979,7 @@ function createSpecSwatch(color) {
 
 async function createSpecPill(text, color) {
   const pill = figma.createFrame();
-  const pillWidth = Math.min(Math.max(text.length * 8 + 22, 56), 144);
+  const pillWidth = Math.min(Math.max(text.length * 7 + 14, 54), 144);
   pill.resize(pillWidth, 20);
   pill.cornerRadius = 999;
   pill.fills = [{ type: "SOLID", color, opacity: 0.1 }];
@@ -987,11 +988,11 @@ async function createSpecPill(text, color) {
   pill.clipsContent = false;
 
   const label = await createTextBlock(text, {
-    width: pillWidth - 16,
+    width: pillWidth - 14,
     fontSize: 11,
     fills: [{ type: "SOLID", color }]
   });
-  label.x = 8;
+  label.x = 7;
   label.y = 3;
   pill.appendChild(label);
   return pill;
