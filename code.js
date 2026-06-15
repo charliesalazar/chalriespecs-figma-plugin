@@ -555,6 +555,15 @@ function hasUsefulValue(value) {
 
 function formatDisplayEnum(value, fallback = "n/a") {
   const normalized = formatEnum(value, fallback);
+  const displayOverrides = {
+    min: "Left",
+    max: "Right"
+  };
+
+  if (displayOverrides[normalized]) {
+    return displayOverrides[normalized];
+  }
+
   return normalized
     .split("-")
     .map((part) => `${part.charAt(0).toUpperCase()}${part.slice(1)}`)
@@ -774,7 +783,7 @@ async function upsertVisualSpecOverlay(target, specCard = null) {
     frame.x = x;
     frame.y = studyY;
     const pill = await createPillLabel(title, color);
-    pill.x = 18;
+    pill.x = Math.max((studyWidth - pill.width) / 2, 12);
     pill.y = 12;
     frame.appendChild(pill);
     return frame;
@@ -829,8 +838,8 @@ async function upsertVisualSpecOverlay(target, specCard = null) {
     paddingFrame.appendChild(leftBand);
 
     const topLabel = await createVisualLabel(`T ${padding.top}`, paddingClone.x + Math.max(paddingClone.width / 2 - 18, 0), 40, paddingColor, 54);
-    const leftLabel = await createVisualLabel(`L ${padding.left}`, 8, paddingClone.y + Math.max(paddingClone.height / 2 - 10, 0), paddingColor, 54);
-    const rightLabel = await createVisualLabel(`R ${padding.right}`, paddingClone.x + paddingClone.width + 8, paddingClone.y + Math.max(paddingClone.height / 2 - 10, 0), paddingColor, 54);
+    const leftLabel = await createVisualLabel(`L ${padding.left}`, Math.max(paddingClone.x - 38, 4), paddingClone.y + Math.max(paddingClone.height / 2 - 10, 0), paddingColor, 54);
+    const rightLabel = await createVisualLabel(`R ${padding.right}`, paddingClone.x + paddingClone.width + 6, paddingClone.y + Math.max(paddingClone.height / 2 - 10, 0), paddingColor, 54);
     const bottomLabel = await createVisualLabel(`B ${padding.bottom}`, paddingClone.x + Math.max(paddingClone.width / 2 - 18, 0), paddingClone.y + paddingClone.height + 14, paddingColor, 54);
     paddingFrame.appendChild(topLabel);
     paddingFrame.appendChild(leftLabel);
