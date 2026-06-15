@@ -758,7 +758,7 @@ async function upsertVisualSpecOverlay(target, specCard = null) {
   const studyGap = 20;
   const topMargin = 108;
   const bottomMargin = 28;
-  const leftMargin = 32;
+  const leftMargin = 92;
   const targetLocalY = topMargin;
   const widthGuideY = targetLocalY - 28;
   const heightGuideY = targetLocalY;
@@ -798,16 +798,18 @@ async function upsertVisualSpecOverlay(target, specCard = null) {
   overlay.clipsContent = false;
   overlay.opacity = 1;
 
+  const heightGuideX = targetGuideX - 18;
   overlay.appendChild(createVisualBand(targetGuideX, widthGuideY, target.width, 2, sizeColor, 1));
-  overlay.appendChild(createVisualBand(targetGuideX - 18, heightGuideY, 2, target.height, sizeColor, 1));
+  overlay.appendChild(createVisualBand(heightGuideX, heightGuideY, 2, target.height, sizeColor, 1));
   overlay.appendChild(await createVisualLabel(`${Math.round(target.width)} px`, targetGuideX + Math.max(target.width / 2 - 24, 0), widthGuideY - 16, sizeColor, 70));
-  overlay.appendChild(await createVisualLabel(`${Math.round(target.height)} px`, targetGuideX - 60, heightGuideY + Math.max(target.height / 2 - 8, 0), sizeColor, 70));
+  overlay.appendChild(await createVisualLabel(`${Math.round(target.height)} px`, Math.max(heightGuideX - 58, 4), heightGuideY + Math.max(target.height / 2 - 8, 0), sizeColor, 70));
   overlay.appendChild(await createVisualLabel(target.name, targetGuideX, widthGuideY - 28, { r: 0.39, g: 0.54, b: 0.98 }, 140));
   if (cornerRadius !== "n/a") {
-    const radiusLabelX = targetGuideX + Math.max(target.width - 82, 0);
+    const radiusLabelX = targetGuideX + Math.max(target.width - 76, 0);
     const radiusLabelY = targetLocalY + target.height + 8;
-    overlay.appendChild(createVisualBand(targetGuideX + target.width - 24, targetLocalY + target.height - 3, 24, 3, radiusColor, 1));
-    overlay.appendChild(createVisualBand(targetGuideX + target.width - 3, targetLocalY + target.height - 24, 3, 24, radiusColor, 1));
+    overlay.appendChild(createVisualBand(targetGuideX + target.width - 26, targetLocalY, 26, 3, radiusColor, 1));
+    overlay.appendChild(createVisualBand(targetGuideX + target.width - 3, targetLocalY, 3, 26, radiusColor, 1));
+    overlay.appendChild(createVisualBand(targetGuideX + target.width - 16, targetLocalY + 26, 3, 18, radiusColor, 1));
     overlay.appendChild(await createVisualChip(`Radius ${cornerRadius}`, radiusLabelX, radiusLabelY, radiusColor, radiusFill, 94));
   }
 
