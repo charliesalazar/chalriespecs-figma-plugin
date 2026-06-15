@@ -828,7 +828,7 @@ async function upsertVisualSpecOverlay(target, specCard = null) {
     paddingFrame.appendChild(bottomBand);
     paddingFrame.appendChild(leftBand);
 
-    const topLabel = await createVisualLabel(`T ${padding.top}`, paddingClone.x + Math.max(paddingClone.width / 2 - 18, 0), 36, paddingColor, 54);
+    const topLabel = await createVisualLabel(`T ${padding.top}`, paddingClone.x + Math.max(paddingClone.width / 2 - 18, 0), 44, paddingColor, 54);
     const leftLabel = await createVisualLabel(`L ${padding.left}`, 8, paddingClone.y + Math.max(paddingClone.height / 2 - 10, 0), paddingColor, 54);
     const rightLabel = await createVisualLabel(`R ${padding.right}`, paddingClone.x + paddingClone.width + 8, paddingClone.y + Math.max(paddingClone.height / 2 - 10, 0), paddingColor, 54);
     const bottomLabel = await createVisualLabel(`B ${padding.bottom}`, paddingClone.x + Math.max(paddingClone.width / 2 - 18, 0), paddingClone.y + paddingClone.height + 18, paddingColor, 54);
