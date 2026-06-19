@@ -102,6 +102,9 @@
         font: inherit;
         font-size: 13px;
         cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
         transition: transform 120ms ease, opacity 120ms ease, background 120ms ease;
       }
 
@@ -116,6 +119,18 @@
       .primary {
         background: var(--accent);
         color: white;
+      }
+
+      .shortcut {
+        min-width: 24px;
+        padding: 2px 7px 3px;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.22);
+        border: 1px solid rgba(255, 255, 255, 0.34);
+        color: inherit;
+        font-family: "Azeret Mono", "SFMono-Regular", monospace;
+        font-size: 10px;
+        line-height: 1.2;
       }
 
       .secondary {
@@ -247,7 +262,7 @@
           canvas beside the selected frame or layer.
         </p>
         <div class="toolbar">
-          <button class="primary" id="placeButton">Place On Canvas</button>
+          <button class="primary" id="placeButton">Place On Canvas <span class="shortcut">↵</span></button>
           <button class="secondary" id="copyButton">Copy Markdown</button>
           <button class="secondary" id="copyJsonButton">Copy JSON</button>
           <button class="secondary" id="refreshButton">Refresh</button>
