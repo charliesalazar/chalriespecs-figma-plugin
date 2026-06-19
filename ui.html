@@ -387,13 +387,14 @@ Select one or more layers in Figma to generate specs.</pre>
 
           const now = context.currentTime;
           if (kind === "place-start") {
-            playTone(440, now, 0.055, 0.035, "triangle");
+            playTone(440, now, 0.05, 0.032, "triangle");
+            playTone(554.37, now + 0.048, 0.055, 0.024, "triangle");
             return;
           }
 
           if (kind === "place-complete") {
-            playTone(587.33, now, 0.075, 0.032, "sine");
-            playTone(783.99, now + 0.075, 0.095, 0.028, "sine");
+            playTone(1046.5, now, 0.12, 0.032, "sine");
+            playTone(1567.98, now + 0.085, 0.14, 0.026, "sine");
           }
         } catch (error) {
           // Ignore audio errors so Figma document actions keep working.
