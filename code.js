@@ -856,10 +856,8 @@ async function upsertVisualSpecOverlay(target, specCard = null) {
     if (hasRoomBesideTarget) {
       overlay.appendChild(createVisualBand(targetGuideX + target.width, leaderY, labelX - targetGuideX - target.width - 2, 2, radiusColor, 1));
     } else {
-      const elbowX = targetGuideX + target.width;
-      const elbowHeight = Math.max(labelY + 12 - leaderY, 1);
-      overlay.appendChild(createVisualBand(elbowX, leaderY, 2, elbowHeight, radiusColor, 1));
-      overlay.appendChild(createVisualBand(labelX + radiusChipWidth, labelY + 12, elbowX - labelX - radiusChipWidth + 2, 2, radiusColor, 1));
+      const connectorX = labelX + radiusChipWidth - 8;
+      overlay.appendChild(createVisualBand(connectorX, labelY, 8, 2, radiusColor, 1));
     }
     overlay.appendChild(await createVisualChip(`r ${cornerRadius}`, labelX, labelY, radiusColor, radiusFill, radiusChipWidth));
   }
