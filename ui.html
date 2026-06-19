@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <title>Selection Specs Generator</title>
+    <title>CharlieSpecs</title>
     <style>
       :root {
         color-scheme: light dark;
@@ -13,6 +13,7 @@
         --muted: #59706e;
         --accent: #0e7c66;
         --accent-strong: #085c4c;
+        --accent-warm: #f28a3d;
         --line: rgba(16, 42, 42, 0.12);
         --shadow: 0 18px 48px rgba(18, 37, 34, 0.14);
       }
@@ -26,6 +27,7 @@
           --muted: #a5bbb6;
           --accent: #5ad0b3;
           --accent-strong: #88e8cf;
+          --accent-warm: #ffb266;
           --line: rgba(255, 255, 255, 0.08);
           --shadow: 0 18px 48px rgba(0, 0, 0, 0.3);
         }
@@ -69,16 +71,16 @@
         margin: 0 0 8px;
         font-family: "Azeret Mono", "SFMono-Regular", monospace;
         font-size: 11px;
-        letter-spacing: 0.14em;
+        letter-spacing: 0.08em;
         text-transform: uppercase;
         color: var(--accent);
       }
 
       h1 {
         margin: 0;
-        font-size: 26px;
-        line-height: 1;
-        letter-spacing: -0.04em;
+        font-size: 30px;
+        line-height: 0.96;
+        letter-spacing: -0.035em;
       }
 
       .subhead {
@@ -117,19 +119,26 @@
       }
 
       .primary {
-        background: var(--accent);
+        min-height: 54px;
+        padding: 15px 18px 15px 22px;
+        border-radius: 18px;
+        background: linear-gradient(135deg, var(--accent) 0%, #6bd0b6 62%, var(--accent-warm) 100%);
         color: white;
+        font-size: 15px;
+        font-weight: 700;
+        letter-spacing: -0.01em;
+        box-shadow: 0 14px 30px rgba(14, 124, 102, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.28);
       }
 
       .shortcut {
-        min-width: 24px;
-        padding: 2px 7px 3px;
-        border-radius: 999px;
-        background: rgba(255, 255, 255, 0.22);
-        border: 1px solid rgba(255, 255, 255, 0.34);
+        min-width: 28px;
+        padding: 3px 8px 4px;
+        border-radius: 10px;
+        background: rgba(255, 255, 255, 0.2);
+        border: 1px solid rgba(255, 255, 255, 0.42);
         color: inherit;
         font-family: "Azeret Mono", "SFMono-Regular", monospace;
-        font-size: 10px;
+        font-size: 11px;
         line-height: 1.2;
       }
 
@@ -137,6 +146,7 @@
         background: transparent;
         color: var(--ink);
         border: 1px solid var(--line);
+        opacity: 0.82;
       }
 
       .meta {
@@ -255,18 +265,16 @@
   <body>
     <div class="shell">
       <section class="hero">
-        <p class="eyebrow">Figma Plugin Concept</p>
-        <h1>Selection Specs</h1>
+        <p class="eyebrow">CharlieSpecs</p>
+        <h1>Selection notes, fast.</h1>
         <p class="subhead">
-          Inspect the current selection, preview the generated data, and place a specs card directly on the
-          canvas beside the selected frame or layer.
+          Turn the selected layer into a specs card and visual callouts right on the canvas.
         </p>
         <div class="toolbar">
           <button class="primary" id="placeButton">Place On Canvas <span class="shortcut">↵</span></button>
           <button class="secondary" id="copyButton">Copy Markdown</button>
           <button class="secondary" id="copyJsonButton">Copy JSON</button>
           <button class="secondary" id="refreshButton">Refresh</button>
-          <button class="secondary" id="soundButton" aria-pressed="true">Sound On</button>
           <div class="meta">
             <div class="pill" id="selectionCount">0 layers selected</div>
             <div class="pill" id="generatedAt">Waiting for selection</div>
@@ -298,23 +306,6 @@ Select one or more layers in Figma to generate specs.</pre>
     </div>
 
     <script>
-      function getStoredSoundPreference() {
-        try {
-          return localStorage.getItem("selectionSpecsSound") !== "off";
-        } catch (error) {
-          return true;
-        }
-      }
-
-      function setStoredSoundPreference(enabled) {
-        try {
-          localStorage.setItem("selectionSpecsSound", enabled ? "on" : "off");
-        } catch (error) {
-          // Storage can be unavailable in some plugin iframe contexts; sound
-          // should never block the primary canvas placement workflow.
-        }
-      }
-
       // This mirrors the latest payload from the plugin runtime so button
       // handlers can work without re-reading the DOM.
       const state = {
@@ -323,8 +314,7 @@ Select one or more layers in Figma to generate specs.</pre>
         json: "",
         canPlace: false,
         placeMessage: "",
-        runtimeError: "",
-        soundEnabled: getStoredSoundPreference()
+        runtimeError: ""
       };
 
       const summary = document.getElementById("summary");
@@ -337,14 +327,7 @@ Select one or more layers in Figma to generate specs.</pre>
       const copyButton = document.getElementById("copyButton");
       const copyJsonButton = document.getElementById("copyJsonButton");
       const refreshButton = document.getElementById("refreshButton");
-      const soundButton = document.getElementById("soundButton");
       let audioContext = null;
-
-      function updateSoundButton() {
-        soundButton.textContent = state.soundEnabled ? "Sound On" : "Sound Off";
-        soundButton.setAttribute("aria-pressed", state.soundEnabled ? "true" : "false");
-        soundButton.style.opacity = state.soundEnabled ? "1" : "0.65";
-      }
 
       function getAudioContext() {
         try {
@@ -391,10 +374,6 @@ Select one or more layers in Figma to generate specs.</pre>
 
       function playFeedbackSound(kind) {
         try {
-          if (!state.soundEnabled) {
-            return;
-          }
-
           const context = getAudioContext();
           if (!context) {
             return;
@@ -518,7 +497,6 @@ Select one or more layers in Figma to generate specs.</pre>
         placeStatus.textContent = state.runtimeError
           ? `${state.placeMessage} Last error: ${state.runtimeError}`
           : state.placeMessage;
-        updateSoundButton();
 
         if (!state.layers.length) {
           summary.className = "empty";
@@ -626,13 +604,6 @@ Select one or more layers in Figma to generate specs.</pre>
         parent.postMessage({ pluginMessage: { type: "refresh" } }, "*");
       });
 
-      soundButton.addEventListener("click", () => {
-        state.soundEnabled = !state.soundEnabled;
-        setStoredSoundPreference(state.soundEnabled);
-        updateSoundButton();
-      });
-
-      updateSoundButton();
       setTimeout(() => {
         parent.postMessage({ pluginMessage: { type: "refresh" } }, "*");
       }, 0);
