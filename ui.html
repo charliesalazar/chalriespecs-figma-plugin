@@ -402,6 +402,25 @@ Select one or more layers in Figma to generate specs.</pre>
         }
       }
 
+      function shouldIgnoreShortcut(event) {
+        const target = event.target;
+        if (!target) {
+          return false;
+        }
+
+        const tagName = target.tagName ? target.tagName.toLowerCase() : "";
+        return tagName === "input" || tagName === "textarea" || tagName === "select" || target.isContentEditable;
+      }
+
+      function placeSpecsFromUi() {
+        if (!state.canPlace) {
+          return;
+        }
+
+        playFeedbackSound("place-start");
+        parent.postMessage({ pluginMessage: { type: "place-specs" } }, "*");
+      }
+
       // Timestamps come from the plugin runtime as ISO strings.
       function formatTimestamp(isoString) {
         const date = new Date(isoString);
@@ -551,9 +570,15 @@ Select one or more layers in Figma to generate specs.</pre>
         }
       };
 
-      placeButton.addEventListener("click", () => {
-        playFeedbackSound("place-start");
-        parent.postMessage({ pluginMessage: { type: "place-specs" } }, "*");
+      placeButton.addEventListener("click", placeSpecsFromUi);
+
+      document.addEventListener("keydown", (event) => {
+        if (event.key !== "Enter" || shouldIgnoreShortcut(event)) {
+          return;
+        }
+
+        event.preventDefault();
+        placeSpecsFromUi();
       });
 
       copyButton.addEventListener("click", async () => {
