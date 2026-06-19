@@ -616,6 +616,18 @@ function createVisualBand(x, y, width, height, color, opacity) {
   return band;
 }
 
+function createCornerRadiusArc(x, y, radius, color) {
+  const size = Math.max(radius, 6);
+  const stroke = rgbToHex(color);
+  const arc = figma.createNodeFromSvg(
+    `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M0 0 Q${size} 0 ${size} ${size}" stroke="${stroke}" stroke-width="2" stroke-linecap="round"/></svg>`
+  );
+  arc.name = "Corner radius arc";
+  arc.x = x;
+  arc.y = y;
+  return arc;
+}
+
 function createVisualSurface(x, y, width, height, options) {
   const surface = figma.createFrame();
   surface.x = x;
@@ -744,12 +756,29 @@ function getPaddingValues(node) {
   };
 }
 
+function getUniformCornerRadiusValue(node) {
+  if ("topLeftRadius" in node && "topRightRadius" in node && "bottomRightRadius" in node && "bottomLeftRadius" in node) {
+    const values = [node.topLeftRadius, node.topRightRadius, node.bottomRightRadius, node.bottomLeftRadius];
+    if (values.every((value) => typeof value === "number" && value === values[0])) {
+      return round(values[0]);
+    }
+  }
+
+  if ("cornerRadius" in node && typeof node.cornerRadius === "number") {
+    return round(node.cornerRadius);
+  }
+
+  return null;
+}
+
 async function upsertVisualSpecOverlay(target, specCard = null) {
   const existing = findExistingVisualSpec(target.id);
   const overlay = existing || figma.createFrame();
   const origin = getCanvasPosition(target);
   const card = specCard || findExistingSpecCard(target.id);
   const padding = getPaddingValues(target);
+  const cornerRadius = describeCornerRadius(target);
+  const cornerRadiusValue = getUniformCornerRadiusValue(target);
   const isText = target.type === "TEXT";
   const textNode = isText ? target : findChildByType(target, "TEXT");
   const iconNode = findNodeByName(target, "pizza icon");
@@ -782,7 +811,6 @@ async function upsertVisualSpecOverlay(target, specCard = null) {
   const sizeColor = { r: 0.33, g: 0.78, b: 0.73 };
   const radiusColor = { r: 0.98, g: 0.5, b: 0.18 };
   const radiusFill = { r: 1, g: 0.95, b: 0.88 };
-  const cornerRadius = describeCornerRadius(target);
 
   removeChildren(overlay);
 
@@ -798,6 +826,13 @@ async function upsertVisualSpecOverlay(target, specCard = null) {
   overlay.clipsContent = false;
   overlay.opacity = 1;
 
+  const targetPreview = target.clone();
+  targetPreview.name = `${target.name} preview`;
+  targetPreview.x = targetGuideX;
+  targetPreview.y = targetLocalY;
+  targetPreview.opacity = 0.2;
+  overlay.appendChild(targetPreview);
+
   const heightGuideX = targetGuideX - 18;
   overlay.appendChild(createVisualBand(targetGuideX, widthGuideY, target.width, 2, sizeColor, 1));
   overlay.appendChild(createVisualBand(heightGuideX, heightGuideY, 2, target.height, sizeColor, 1));
@@ -805,14 +840,16 @@ async function upsertVisualSpecOverlay(target, specCard = null) {
   overlay.appendChild(await createVisualLabel(`${Math.round(target.height)} px`, Math.max(heightGuideX - 58, 4), heightGuideY + Math.max(target.height / 2 - 8, 0), sizeColor, 70));
   overlay.appendChild(await createVisualLabel(target.name, targetGuideX, widthGuideY - 28, { r: 0.39, g: 0.54, b: 0.98 }, 140));
   if (cornerRadius !== "n/a") {
-    const radiusGuideX = targetGuideX + target.width + 10;
-    const radiusGuideY = targetLocalY + 8;
-    const radiusLabelX = targetGuideX + Math.max(target.width - 28, 0);
-    const radiusLabelY = targetLocalY + target.height + 10;
-    overlay.appendChild(createVisualBand(radiusGuideX, radiusGuideY, 18, 3, radiusColor, 1));
-    overlay.appendChild(createVisualBand(radiusGuideX, radiusGuideY, 3, 22, radiusColor, 1));
-    overlay.appendChild(createVisualBand(radiusGuideX - 10, radiusGuideY + 22, 13, 3, radiusColor, 1));
-    overlay.appendChild(await createVisualChip(`Radius ${cornerRadius}`, radiusLabelX, radiusLabelY, radiusColor, radiusFill, 94));
+    const radiusSize = Math.min(cornerRadiusValue || 8, target.width, target.height);
+    const arcX = targetGuideX + target.width - radiusSize;
+    const arcY = targetLocalY;
+    const leaderX = targetGuideX + target.width + 8;
+    const leaderY = targetLocalY + radiusSize;
+    const labelX = leaderX + 10;
+    const labelY = leaderY - 10;
+    overlay.appendChild(createCornerRadiusArc(arcX, arcY, radiusSize, radiusColor));
+    overlay.appendChild(createVisualBand(targetGuideX + target.width, leaderY, 16, 2, radiusColor, 1));
+    overlay.appendChild(await createVisualChip(`r ${cornerRadius}`, labelX, labelY, radiusColor, radiusFill, 62));
   }
 
   const createStudyFrame = async (title, color, fill, x) => {
