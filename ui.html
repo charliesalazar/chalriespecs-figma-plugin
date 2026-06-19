@@ -63,8 +63,6 @@
 
       .hero {
         padding: 18px;
-        position: sticky;
-        top: 0;
       }
 
       .eyebrow {
@@ -90,11 +88,12 @@
         line-height: 1.45;
       }
 
-      .toolbar {
+      .action-stack {
         display: flex;
-        gap: 10px;
-        flex-wrap: wrap;
-        align-items: center;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 12px;
+        margin-top: 18px;
       }
 
       button {
@@ -150,28 +149,27 @@
       }
 
       .meta {
-        margin-left: auto;
         display: flex;
-        gap: 8px;
+        gap: 14px;
         align-items: center;
         flex-wrap: wrap;
+        color: var(--muted);
+        font-size: 12px;
       }
 
       .pill {
-        padding: 7px 11px;
-        border-radius: 999px;
-        background: var(--panel-strong);
-        border: 1px solid var(--line);
-        font-size: 12px;
-        color: var(--muted);
+        padding: 0;
+        border-radius: 0;
+        background: transparent;
+        border: 0;
+        color: inherit;
       }
 
       .status {
-        margin-top: 12px;
-        padding: 10px 12px;
-        border-radius: 12px;
-        background: var(--panel-strong);
-        border: 1px solid var(--line);
+        padding: 0;
+        border-radius: 0;
+        background: transparent;
+        border: 0;
         color: var(--muted);
         font-size: 12px;
         line-height: 1.45;
@@ -181,10 +179,23 @@
         padding: 16px;
       }
 
+      .panel-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 12px;
+      }
+
       .panel h2 {
-        margin: 0 0 12px;
+        margin: 0;
         font-size: 15px;
         letter-spacing: -0.02em;
+      }
+
+      .panel-header button {
+        padding: 7px 11px;
+        font-size: 12px;
       }
 
       .empty {
@@ -270,33 +281,39 @@
         <p class="subhead">
           Turn the selected layer into a specs card and visual callouts right on the canvas.
         </p>
-        <div class="toolbar">
+        <div class="action-stack">
           <button class="primary" id="placeButton">Place On Canvas <span class="shortcut">↵</span></button>
-          <button class="secondary" id="copyButton">Copy Markdown</button>
-          <button class="secondary" id="copyJsonButton">Copy JSON</button>
-          <button class="secondary" id="refreshButton">Refresh</button>
           <div class="meta">
             <div class="pill" id="selectionCount">0 layers selected</div>
             <div class="pill" id="generatedAt">Waiting for selection</div>
           </div>
+          <div class="status" id="placeStatus">Select a single frame or layer to place specs on the canvas.</div>
         </div>
-        <div class="status" id="placeStatus">Select a single frame or layer to place specs on the canvas.</div>
       </section>
 
       <section class="panel">
-        <h2>Layer Summary</h2>
+        <div class="panel-header">
+          <h2>Layer Summary</h2>
+          <button class="secondary" id="refreshButton">Refresh</button>
+        </div>
         <div id="summary" class="empty">Select one or more frames, components, or text layers in Figma.</div>
       </section>
 
       <section class="panel">
-        <h2>Markdown Output</h2>
+        <div class="panel-header">
+          <h2>Markdown Output</h2>
+          <button class="secondary" id="copyButton">Copy Markdown</button>
+        </div>
         <pre id="markdown"># Selection Specs
 
 Select one or more layers in Figma to generate specs.</pre>
       </section>
 
       <section class="panel">
-        <h2>JSON Output</h2>
+        <div class="panel-header">
+          <h2>JSON Output</h2>
+          <button class="secondary" id="copyJsonButton">Copy JSON</button>
+        </div>
         <pre id="json">{
   "generatedAt": "",
   "selectedCount": 0,
