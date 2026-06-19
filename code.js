@@ -1328,6 +1328,7 @@ figma.ui.onmessage = (message) => {
         clearRuntimeError();
         figma.viewport.scrollAndZoomIntoView([selectionState.target, card, overlay]);
         figma.notify(`Specs placed beside "${selectionState.target.name}".`);
+        figma.ui.postMessage({ type: "place-specs-complete" });
         sendSelectionSpecs();
       })
       .catch((error) => {

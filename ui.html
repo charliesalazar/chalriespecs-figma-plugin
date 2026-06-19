@@ -251,6 +251,7 @@
           <button class="secondary" id="copyButton">Copy Markdown</button>
           <button class="secondary" id="copyJsonButton">Copy JSON</button>
           <button class="secondary" id="refreshButton">Refresh</button>
+          <button class="secondary" id="soundButton" aria-pressed="true">Sound On</button>
           <div class="meta">
             <div class="pill" id="selectionCount">0 layers selected</div>
             <div class="pill" id="generatedAt">Waiting for selection</div>
@@ -282,6 +283,23 @@ Select one or more layers in Figma to generate specs.</pre>
     </div>
 
     <script>
+      function getStoredSoundPreference() {
+        try {
+          return localStorage.getItem("selectionSpecsSound") !== "off";
+        } catch (error) {
+          return true;
+        }
+      }
+
+      function setStoredSoundPreference(enabled) {
+        try {
+          localStorage.setItem("selectionSpecsSound", enabled ? "on" : "off");
+        } catch (error) {
+          // Storage can be unavailable in some plugin iframe contexts; sound
+          // should never block the primary canvas placement workflow.
+        }
+      }
+
       // This mirrors the latest payload from the plugin runtime so button
       // handlers can work without re-reading the DOM.
       const state = {
@@ -290,7 +308,8 @@ Select one or more layers in Figma to generate specs.</pre>
         json: "",
         canPlace: false,
         placeMessage: "",
-        runtimeError: ""
+        runtimeError: "",
+        soundEnabled: getStoredSoundPreference()
       };
 
       const summary = document.getElementById("summary");
@@ -303,6 +322,83 @@ Select one or more layers in Figma to generate specs.</pre>
       const copyButton = document.getElementById("copyButton");
       const copyJsonButton = document.getElementById("copyJsonButton");
       const refreshButton = document.getElementById("refreshButton");
+      const soundButton = document.getElementById("soundButton");
+      let audioContext = null;
+
+      function updateSoundButton() {
+        soundButton.textContent = state.soundEnabled ? "Sound On" : "Sound Off";
+        soundButton.setAttribute("aria-pressed", state.soundEnabled ? "true" : "false");
+        soundButton.style.opacity = state.soundEnabled ? "1" : "0.65";
+      }
+
+      function getAudioContext() {
+        try {
+          if (!audioContext) {
+            const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+            if (!AudioContextClass) {
+              return null;
+            }
+
+            audioContext = new AudioContextClass();
+          }
+
+          if (audioContext.state === "suspended") {
+            const resumeResult = audioContext.resume();
+            if (resumeResult && typeof resumeResult.catch === "function") {
+              resumeResult.catch(() => {});
+            }
+          }
+
+          return audioContext;
+        } catch (error) {
+          return null;
+        }
+      }
+
+      function playTone(frequency, startTime, duration, volume, type = "sine") {
+        const context = getAudioContext();
+        if (!context) {
+          return;
+        }
+
+        const oscillator = context.createOscillator();
+        const gain = context.createGain();
+        oscillator.type = type;
+        oscillator.frequency.setValueAtTime(frequency, startTime);
+        gain.gain.setValueAtTime(0.0001, startTime);
+        gain.gain.exponentialRampToValueAtTime(volume, startTime + 0.012);
+        gain.gain.exponentialRampToValueAtTime(0.0001, startTime + duration);
+        oscillator.connect(gain);
+        gain.connect(context.destination);
+        oscillator.start(startTime);
+        oscillator.stop(startTime + duration + 0.01);
+      }
+
+      function playFeedbackSound(kind) {
+        try {
+          if (!state.soundEnabled) {
+            return;
+          }
+
+          const context = getAudioContext();
+          if (!context) {
+            return;
+          }
+
+          const now = context.currentTime;
+          if (kind === "place-start") {
+            playTone(440, now, 0.055, 0.035, "triangle");
+            return;
+          }
+
+          if (kind === "place-complete") {
+            playTone(587.33, now, 0.075, 0.032, "sine");
+            playTone(783.99, now + 0.075, 0.095, 0.028, "sine");
+          }
+        } catch (error) {
+          // Ignore audio errors so Figma document actions keep working.
+        }
+      }
 
       // Timestamps come from the plugin runtime as ISO strings.
       function formatTimestamp(isoString) {
@@ -386,6 +482,7 @@ Select one or more layers in Figma to generate specs.</pre>
         placeStatus.textContent = state.runtimeError
           ? `${state.placeMessage} Last error: ${state.runtimeError}`
           : state.placeMessage;
+        updateSoundButton();
 
         if (!state.layers.length) {
           summary.className = "empty";
@@ -437,15 +534,23 @@ Select one or more layers in Figma to generate specs.</pre>
 
       // The runtime is the source of truth; this UI just reacts to its messages.
       window.onmessage = (event) => {
-        const message = event.data.pluginMessage;
-        if (!message || message.type !== "selection-specs") {
+        const message = event.data && event.data.pluginMessage;
+        if (!message) {
           return;
         }
 
-        render(message.payload);
+        if (message.type === "selection-specs") {
+          render(message.payload);
+          return;
+        }
+
+        if (message.type === "place-specs-complete") {
+          playFeedbackSound("place-complete");
+        }
       };
 
       placeButton.addEventListener("click", () => {
+        playFeedbackSound("place-start");
         parent.postMessage({ pluginMessage: { type: "place-specs" } }, "*");
       });
 
@@ -478,6 +583,17 @@ Select one or more layers in Figma to generate specs.</pre>
       refreshButton.addEventListener("click", () => {
         parent.postMessage({ pluginMessage: { type: "refresh" } }, "*");
       });
+
+      soundButton.addEventListener("click", () => {
+        state.soundEnabled = !state.soundEnabled;
+        setStoredSoundPreference(state.soundEnabled);
+        updateSoundButton();
+      });
+
+      updateSoundButton();
+      setTimeout(() => {
+        parent.postMessage({ pluginMessage: { type: "refresh" } }, "*");
+      }, 0);
     </script>
   </body>
 </html>
