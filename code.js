@@ -900,7 +900,8 @@ async function upsertVisualSpecOverlay(target, specCard = null) {
   const paddingFrame = await createStudyFrame("Padding only", paddingColor, paddingFill, studyStartX);
   const strokeFrame = await createStudyFrame("Stroke only", strokeColor, strokeFill, studyStartX + studyWidth + studyGap);
   const textFrame = await createStudyFrame("Text only", textColor, textFill, studyStartX + (studyWidth + studyGap) * 2);
-  paddingFrame.strokeWeight = 1.5;
+  paddingFrame.strokeWeight = 1;
+  paddingFrame.strokes = [{ type: "SOLID", color: paddingColor, opacity: 0.75 }];
 
   overlay.appendChild(paddingFrame);
   overlay.appendChild(strokeFrame);
@@ -911,14 +912,16 @@ async function upsertVisualSpecOverlay(target, specCard = null) {
   const textClone = createStudyClone(textFrame);
 
   if (padding) {
-    const topBand = createVisualBand(paddingClone.x, paddingClone.y, paddingClone.width, padding.top, paddingColor, 0.58);
+    const paddingBandOpacity = 0.32;
+    const paddingStrokeOpacity = 0.38;
+    const topBand = createVisualBand(paddingClone.x, paddingClone.y, paddingClone.width, padding.top, paddingColor, paddingBandOpacity);
     const rightBand = createVisualBand(
       paddingClone.x + Math.max(paddingClone.width - padding.right, 0),
       paddingClone.y,
       padding.right,
       paddingClone.height,
       paddingColor,
-      0.58
+      paddingBandOpacity
     );
     const bottomBand = createVisualBand(
       paddingClone.x,
@@ -926,13 +929,13 @@ async function upsertVisualSpecOverlay(target, specCard = null) {
       paddingClone.width,
       padding.bottom,
       paddingColor,
-      0.58
+      paddingBandOpacity
     );
-    const leftBand = createVisualBand(paddingClone.x, paddingClone.y, padding.left, paddingClone.height, paddingColor, 0.58);
-    topBand.strokes = [{ type: "SOLID", color: paddingColor, opacity: 0.8 }];
-    rightBand.strokes = [{ type: "SOLID", color: paddingColor, opacity: 0.8 }];
-    bottomBand.strokes = [{ type: "SOLID", color: paddingColor, opacity: 0.8 }];
-    leftBand.strokes = [{ type: "SOLID", color: paddingColor, opacity: 0.8 }];
+    const leftBand = createVisualBand(paddingClone.x, paddingClone.y, padding.left, paddingClone.height, paddingColor, paddingBandOpacity);
+    topBand.strokes = [{ type: "SOLID", color: paddingColor, opacity: paddingStrokeOpacity }];
+    rightBand.strokes = [{ type: "SOLID", color: paddingColor, opacity: paddingStrokeOpacity }];
+    bottomBand.strokes = [{ type: "SOLID", color: paddingColor, opacity: paddingStrokeOpacity }];
+    leftBand.strokes = [{ type: "SOLID", color: paddingColor, opacity: paddingStrokeOpacity }];
     paddingFrame.appendChild(topBand);
     paddingFrame.appendChild(rightBand);
     paddingFrame.appendChild(bottomBand);
