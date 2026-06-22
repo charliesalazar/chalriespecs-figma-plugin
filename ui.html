@@ -6,23 +6,23 @@
     <style>
       :root {
         color-scheme: light dark;
-        --bg: linear-gradient(180deg, #f5efe3 0%, #e8f0ec 100%);
-        --panel: rgba(255, 255, 255, 0.78);
-        --panel-strong: rgba(255, 255, 255, 0.92);
+        --bg: #eef3f0;
+        --panel: #fbfcf8;
+        --panel-strong: #f6f8f3;
         --ink: #102a2a;
         --muted: #59706e;
         --accent: #0e7c66;
         --accent-strong: #085c4c;
         --accent-warm: #f28a3d;
         --line: rgba(16, 42, 42, 0.12);
-        --shadow: 0 18px 48px rgba(18, 37, 34, 0.14);
+        --shadow: none;
       }
 
       @media (prefers-color-scheme: dark) {
         :root {
-          --bg: linear-gradient(180deg, #13201f 0%, #0b1615 100%);
-          --panel: rgba(20, 31, 30, 0.8);
-          --panel-strong: rgba(16, 26, 25, 0.92);
+          --bg: #0d1514;
+          --panel: #111d1b;
+          --panel-strong: #0d1816;
           --ink: #eff6f3;
           --muted: #a5bbb6;
           --accent: #5ad0b3;
@@ -46,39 +46,39 @@
       }
 
       .shell {
-        padding: 18px;
+        padding: 16px;
         display: flex;
         flex-direction: column;
-        gap: 14px;
+        gap: 16px;
       }
 
       .hero,
       .panel {
         background: var(--panel);
-        backdrop-filter: blur(16px);
         border: 1px solid var(--line);
-        border-radius: 18px;
+        border-left: 3px solid var(--accent);
+        border-radius: 7px;
         box-shadow: var(--shadow);
       }
 
       .hero {
-        padding: 18px;
+        padding: 22px 20px 20px;
       }
 
       .eyebrow {
         margin: 0 0 8px;
         font-family: "Azeret Mono", "SFMono-Regular", monospace;
         font-size: 11px;
-        letter-spacing: 0.08em;
+        letter-spacing: 0.1em;
         text-transform: uppercase;
         color: var(--accent);
       }
 
       h1 {
         margin: 0;
-        font-size: 30px;
-        line-height: 0.96;
-        letter-spacing: -0.035em;
+        font-size: 29px;
+        line-height: 1.02;
+        letter-spacing: -0.025em;
       }
 
       .subhead {
@@ -92,13 +92,13 @@
         display: flex;
         flex-direction: column;
         align-items: flex-start;
-        gap: 12px;
-        margin-top: 18px;
+        gap: 10px;
+        margin-top: 20px;
       }
 
       button {
         border: 0;
-        border-radius: 999px;
+        border-radius: 7px;
         padding: 11px 16px;
         font: inherit;
         font-size: 13px;
@@ -118,23 +118,24 @@
       }
 
       .primary {
-        min-height: 54px;
-        padding: 15px 18px 15px 22px;
-        border-radius: 18px;
-        background: linear-gradient(135deg, var(--accent) 0%, #6bd0b6 62%, var(--accent-warm) 100%);
+        min-height: 52px;
+        padding: 14px 16px 14px 18px;
+        border-radius: 8px;
+        background: var(--accent);
         color: white;
         font-size: 15px;
         font-weight: 700;
         letter-spacing: -0.01em;
-        box-shadow: 0 14px 30px rgba(14, 124, 102, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.28);
+        border-bottom: 4px solid var(--accent-warm);
+        box-shadow: 0 10px 22px rgba(14, 124, 102, 0.18);
       }
 
       .shortcut {
         min-width: 28px;
         padding: 3px 8px 4px;
-        border-radius: 10px;
-        background: rgba(255, 255, 255, 0.2);
-        border: 1px solid rgba(255, 255, 255, 0.42);
+        border-radius: 5px;
+        background: rgba(255, 255, 255, 0.16);
+        border: 1px solid rgba(255, 255, 255, 0.36);
         color: inherit;
         font-family: "Azeret Mono", "SFMono-Regular", monospace;
         font-size: 11px;
@@ -176,7 +177,7 @@
       }
 
       .panel {
-        padding: 16px;
+        padding: 18px 16px;
       }
 
       .panel-header {
@@ -212,7 +213,7 @@
       .card {
         background: var(--panel-strong);
         border: 1px solid var(--line);
-        border-radius: 16px;
+        border-radius: 6px;
         padding: 14px;
       }
 
@@ -263,7 +264,7 @@
         max-height: 320px;
         overflow: auto;
         padding: 14px;
-        border-radius: 14px;
+        border-radius: 6px;
         background: #101918;
         color: #effaf4;
         font-family: "Azeret Mono", "SFMono-Regular", monospace;
